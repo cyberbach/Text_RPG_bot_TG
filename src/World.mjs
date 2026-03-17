@@ -230,7 +230,7 @@ export class WorldGenerator {
 
     getItemsText(x, y) {
         let resultString = '';
-        const itemsToDisplay = this.getItemsAtLocation(y, x);
+        const itemsToDisplay = this.getItemsAtLocation(x, y);
 
         if (itemsToDisplay.length > 0) {
             resultString += 'Объекты на локации:\n'; //👥

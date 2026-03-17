@@ -8,6 +8,7 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
         if (Math.random() > 0.5) {
             const damageAmount = inPlayer.getAttackPower();
             const isAlive = oneNpc.modifyHealth(-damageAmount);
+            inPlayer.addExperienceForAction(5);
             attackResult +=
                 inPlayer.name +
                 ' наносит ' +
@@ -25,6 +26,7 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
                 inWorld.generateOneItem(x, y);
             }
         } else {
+            inPlayer.addExperienceForAction(1);
             attackResult += inPlayer.name + ' промахнулся\n';
         }
     });
@@ -45,10 +47,10 @@ export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer) {
             if (Math.random() > 0.5) {
                 if (oneNpc.agressive) {
                     const damageAmount =
-                        oneNpc.minAttackPower +
+                        Math.min(oneNpc.minAttackPower, oneNpc.maxAttackPower) +
                         Math.floor(
                             Math.random() *
-                                (oneNpc.minAttackPower + oneNpc.maxAttackPower)
+                                (Math.abs(oneNpc.maxAttackPower - oneNpc.minAttackPower) + 1)
                         );
 
                     isAlive = inPlayer.modifyHealth(-damageAmount);

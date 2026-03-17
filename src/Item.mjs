@@ -1,5 +1,6 @@
 import { AdjectiveWords } from './AdjectiveWords.mjs';
 import { DEBUG_ITEMS_CREATION } from './GameDebug.mjs';
+import { TEXT_LABELS } from './TextLabels.mjs';
 
 export class Item {
     constructor() {
@@ -79,9 +80,21 @@ export class Item {
     getItemDescription() {
         let descriptionString = '';
         descriptionString += '- ' + this.name + ' ';
-        descriptionString += this.isHealing
-            ? '❤️ ' + (this.health + this.maxHealth)
-            : '⚔️ ' + (this.minAttackPower + this.maxAttackPower); // ⚔️
+        if (this.isHealing) {
+            const parts = [];
+            if (this.health)
+                parts.push('+' + this.health + ' ' + TEXT_LABELS.health);
+            if (this.maxHealth)
+                parts.push('+' + this.maxHealth + ' ' + TEXT_LABELS.maxHealth);
+            descriptionString += '❤️ ' + (parts.length ? parts.join(', ') : '+0');
+        } else {
+            const parts = [];
+            if (this.minAttackPower)
+                parts.push('+' + this.minAttackPower + ' ' + TEXT_LABELS.minDamage);
+            if (this.maxAttackPower)
+                parts.push('+' + this.maxAttackPower + ' ' + TEXT_LABELS.maxDamage);
+            descriptionString += '⚔️ ' + (parts.length ? parts.join(', ') : '+0');
+        }
         descriptionString += '\n';
         //console.log('monster description: ' + descriptionString);
         return descriptionString;

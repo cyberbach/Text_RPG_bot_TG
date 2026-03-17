@@ -12,6 +12,20 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const startedAt = new Date();
+console.log('========================================');
+console.log('TG Text RPG bot starting...');
+console.log('Time:', startedAt.toISOString());
+console.log('Node:', process.version);
+console.log('Working dir:', process.cwd());
+
+if (!process.env.BOT_TOKEN) {
+    console.error('[FATAL] BOT_TOKEN is missing. Create a .env file with BOT_TOKEN=...');
+    process.exit(1);
+}
+console.log('BOT_TOKEN:', `present (length ${process.env.BOT_TOKEN.length})`);
+console.log('========================================');
+
 // ================= GAME CODE ===================
 
 const WORLD_MOBILE_WIDTH = 4; // 13 максимум на телефоне
@@ -26,12 +40,27 @@ const player = new Player();
 const bot = new TelegramBot(process.env.BOT_TOKEN, {
     polling: {
         interval: 300, // Опционально: интервал опроса в мс
-        autoStart: true,
+        autoStart: false,
     },
 });
 
 bot.on('polling_error', (error) => {
+    const msg = error?.message || String(error);
+    if (msg.includes('409') || msg.toLowerCase().includes('conflict')) {
+        console.error(
+            '[WARN] Telegram API 409 Conflict: another getUpdates request is active.'
+        );
+        console.error(
+            'This is not a code error. Stop other bot instances (or remove webhook) and restart.'
+        );
+        return;
+    }
+
     console.error('Polling error:', error);
+});
+
+bot.on('webhook_error', (error) => {
+    console.error('Webhook error:', error);
 });
 
 const mainMenu = [
@@ -40,6 +69,21 @@ const mainMenu = [
     { command: 'help', description: 'Помощь' },
 ];
 await bot.setMyCommands(mainMenu);
+
+try {
+    const me = await bot.getMe();
+    console.log(`Bot identity: @${me.username} (id: ${me.id})`);
+} catch (e) {
+    console.error('[WARN] bot.getMe() failed:', e);
+}
+
+try {
+    await bot.startPolling();
+    console.log('Polling started. Bot is running and waiting for updates...');
+} catch (e) {
+    console.error('[FATAL] Failed to start polling:', e);
+    process.exit(1);
+}
 
 function generateInlineButtons(availableDirections, availableActions) {
     // Фильтруем кнопки по доступным направлениям
@@ -102,9 +146,7 @@ bot.onText(/\/start/, (msg) => {
         player.getLocationCoords() +
         world.printWorldMap(x, y);
 
-    bot.sendMessage(msg.chat.id, message, buttons, {
-        parse_mode: 'MarkdownV2',
-    });
+    bot.sendMessage(msg.chat.id, message, buttons);
 });
 
 // ================= START on PC ===================
@@ -134,9 +176,7 @@ bot.onText(/\/pc/, (msg) => {
         player.getLocationCoords() +
         world.printWorldMap(x, y);
 
-    bot.sendMessage(msg.chat.id, message, buttons, {
-        parse_mode: 'MarkdownV2',
-    });
+    bot.sendMessage(msg.chat.id, message, buttons);
 });
 
 // ================= HELP ===================
@@ -181,8 +221,8 @@ bot.on('callback_query', (query) => {
 
     let message = '';
 
-    const x = player.getX();
-    const y = player.getY();
+    let x = player.getX();
+    let y = player.getY();
 
     // ================== MOVE ======================
     if (
@@ -191,21 +231,25 @@ bot.on('callback_query', (query) => {
         action === 'move_left' ||
         action === 'move_right'
     ) {
+        let moved = false;
         switch (action) {
             case 'move_up':
-                player.move(DIRECTIONS.UP);
+                moved = player.move(DIRECTIONS.UP);
                 break;
             case 'move_down':
-                player.move(DIRECTIONS.DOWN);
+                moved = player.move(DIRECTIONS.DOWN);
                 break;
             case 'move_left':
-                player.move(DIRECTIONS.LEFT);
+                moved = player.move(DIRECTIONS.LEFT);
                 break;
             case 'move_right':
-                player.move(DIRECTIONS.RIGHT);
+                moved = player.move(DIRECTIONS.RIGHT);
                 break;
             // ... другие действия
         }
+
+        x = player.getX();
+        y = player.getY();
 
         //bot.answerCallbackQuery(action);
         //console.log(action, textResponce);
@@ -214,6 +258,13 @@ bot.on('callback_query', (query) => {
             world.getAvailableDirections(x, y),
             world.getAvailableActions(x, y)
         );
+
+        if (!moved) {
+            message += 'Нельзя идти туда.\n\n';
+            player.addExperienceForAction(1);
+        } else {
+            player.addExperienceForAction(1);
+        }
 
         message +=
             world.GetLocationText(x, y) +
@@ -227,13 +278,33 @@ bot.on('callback_query', (query) => {
     if (action === 'use') {
         message = '';
 
+        x = player.getX();
+        y = player.getY();
+
         const itemsToUse = world.getItemsAtLocation(x, y);
         console.log('объектов на локации было ' + itemsToUse.length);
+        if (itemsToUse.length === 0) {
+            message =
+                'На локации нет предметов.\n\n' +
+                world.GetLocationText(x, y) +
+                player.getLocationCoords() +
+                world.printWorldMap(x, y);
+
+            const buttons = generateInlineButtons(
+                world.getAvailableDirections(x, y),
+                world.getAvailableActions(x, y)
+            );
+
+            bot.sendMessage(currentChatID, message, buttons);
+            bot.answerCallbackQuery(query.id);
+            return;
+        }
         const oneItemToUse =
             itemsToUse[Math.floor(Math.random() * itemsToUse.length)];
         console.log('будем использовать ' + oneItemToUse.name);
         //message = 'Вы использовали ' + oneItemToUse.name;
         message = player.useItem(oneItemToUse);
+        player.addExperienceForAction(1);
         const indexToRemove = world.items.findIndex(
             (item) => item === oneItemToUse
         );
@@ -258,6 +329,8 @@ bot.on('callback_query', (query) => {
     if (action === 'attack') {
         combatState = true;
         message = '';
+        x = player.getX();
+        y = player.getY();
         if (Math.random() > 0.5) {
             message +=
                 PlayerAttackNPC(world, player) +
