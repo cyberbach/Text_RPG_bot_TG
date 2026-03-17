@@ -32,10 +32,45 @@ const WORLD_MOBILE_WIDTH = 4; // 13 максимум на телефоне
 const WORLD_MOBILE_HEIGHT = 4; // 10
 const WORLD_PC_WIDTH = 22;
 const WORLD_PC_HEIGHT = 16;
-let combatState = false;
 
-const world = new WorldGenerator();
-const player = new Player();
+// One game session per chat (in-memory only).
+// Different chats can play simultaneously without interfering.
+const sessions = new Map();
+
+function createNewSession(chatId) {
+    const session = {
+        chatId,
+        world: new WorldGenerator(),
+        player: new Player(),
+        combatState: false,
+        mode: 'mobile',
+    };
+    sessions.set(chatId, session);
+    return session;
+}
+
+function getSession(chatId) {
+    return sessions.get(chatId) ?? createNewSession(chatId);
+}
+
+function setupNewGame(session, { width, height, playerName, mode }) {
+    session.mode = mode;
+    session.combatState = false;
+
+    session.world.setup(width, height);
+    session.world.generate();
+
+    session.player.setup(width, height, playerName);
+    session.player.clearAttributes();
+    session.player.setRandomLocation();
+
+    const x = session.player.getX();
+    const y = session.player.getY();
+    session.world.generateNPC(x, y);
+    session.world.generateItems(x, y);
+
+    return { x, y };
+}
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, {
     polling: {
@@ -122,19 +157,17 @@ function generateInlineButtons(availableDirections, availableActions) {
 // ================= START on Mobile ===================
 // start
 bot.onText(/\/start/, (msg) => {
-    world.setup(WORLD_MOBILE_WIDTH, WORLD_MOBILE_HEIGHT);
-    world.generate();
-    player.setup(WORLD_MOBILE_WIDTH, WORLD_MOBILE_HEIGHT, msg.from.first_name);
-    player.clearAttributes();
-    player.setRandomLocation();
-    const x = player.getX();
-    const y = player.getY();
-    world.generateNPC(x, y);
-    world.generateItems(x, y);
+    const session = createNewSession(msg.chat.id);
+    const { x, y } = setupNewGame(session, {
+        width: WORLD_MOBILE_WIDTH,
+        height: WORLD_MOBILE_HEIGHT,
+        playerName: msg.from.first_name,
+        mode: 'mobile',
+    });
 
     const buttons = generateInlineButtons(
-        world.getAvailableDirections(x, y),
-        world.getAvailableActions(x, y)
+        session.world.getAvailableDirections(x, y),
+        session.world.getAvailableActions(x, y)
     );
 
     const message =
@@ -142,9 +175,9 @@ bot.onText(/\/start/, (msg) => {
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        world.GetLocationText(x, y) +
-        player.getLocationCoords() +
-        world.printWorldMap(x, y);
+        session.world.GetLocationText(x, y) +
+        session.player.getLocationCoords() +
+        session.world.printWorldMap(x, y);
 
     bot.sendMessage(msg.chat.id, message, buttons);
 });
@@ -152,19 +185,17 @@ bot.onText(/\/start/, (msg) => {
 // ================= START on PC ===================
 // start
 bot.onText(/\/pc/, (msg) => {
-    world.setup(WORLD_PC_WIDTH, WORLD_PC_HEIGHT);
-    world.generate();
-    player.setup(WORLD_PC_WIDTH, WORLD_PC_HEIGHT, msg.from.first_name);
-    player.clearAttributes();
-    player.setRandomLocation();
-    const x = player.getX();
-    const y = player.getY();
-    world.generateNPC(x, y);
-    world.generateItems(x, y);
+    const session = createNewSession(msg.chat.id);
+    const { x, y } = setupNewGame(session, {
+        width: WORLD_PC_WIDTH,
+        height: WORLD_PC_HEIGHT,
+        playerName: msg.from.first_name,
+        mode: 'pc',
+    });
 
     const buttons = generateInlineButtons(
-        world.getAvailableDirections(x, y),
-        world.getAvailableActions(x, y)
+        session.world.getAvailableDirections(x, y),
+        session.world.getAvailableActions(x, y)
     );
 
     const message =
@@ -172,9 +203,9 @@ bot.onText(/\/pc/, (msg) => {
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        world.GetLocationText(x, y) +
-        player.getLocationCoords() +
-        world.printWorldMap(x, y);
+        session.world.GetLocationText(x, y) +
+        session.player.getLocationCoords() +
+        session.world.printWorldMap(x, y);
 
     bot.sendMessage(msg.chat.id, message, buttons);
 });
@@ -182,35 +213,36 @@ bot.onText(/\/pc/, (msg) => {
 // ================= HELP ===================
 // help
 bot.onText(/\/help/, (msg) => {
-    //const player = getPlayer(msg.chat.id);
-    //const message = `⚔️ Хелп игры\n\n`;
+    const session = getSession(msg.chat.id);
+    const playerName = msg.from.first_name;
 
-    world.generate();
-    player.setRandomLocation();
+    const sizes =
+        session.mode === 'pc'
+            ? { w: WORLD_PC_WIDTH, h: WORLD_PC_HEIGHT, mode: 'pc' }
+            : { w: WORLD_MOBILE_WIDTH, h: WORLD_MOBILE_HEIGHT, mode: 'mobile' };
 
-    const x = player.getX();
-    const y = player.getY();
-    world.generateNPC(x, y);
+    const { x, y } = setupNewGame(session, {
+        width: sizes.w,
+        height: sizes.h,
+        playerName,
+        mode: sizes.mode,
+    });
 
     const buttons = generateInlineButtons(
-        world.getAvailableDirections(x, y),
-        world.getAvailableActions(x, y)
+        session.world.getAvailableDirections(x, y),
+        session.world.getAvailableActions(x, y)
     );
-
-    console.log(world.printWorldMap(x, y));
 
     const message =
         `⚔️ *Добро пожаловать в Текстовое Подземелье!*\n\n` +
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        world.GetLocationText(x, y) +
-        player.getLocationCoords() +
-        world.printWorldMap(x, y);
+        session.world.GetLocationText(x, y) +
+        session.player.getLocationCoords() +
+        session.world.printWorldMap(x, y);
 
-    bot.sendMessage(msg.chat.id, message, buttons, {
-        parse_mode: 'MarkdownV2',
-    });
+    bot.sendMessage(msg.chat.id, message, buttons);
 });
 
 // ================= CALLBACK QUERY ===================
@@ -218,6 +250,9 @@ bot.onText(/\/help/, (msg) => {
 bot.on('callback_query', (query) => {
     const action = query.data;
     const currentChatID = query.message.chat.id;
+    const session = getSession(currentChatID);
+    const world = session.world;
+    const player = session.player;
 
     let message = '';
 
@@ -327,7 +362,7 @@ bot.on('callback_query', (query) => {
 
     // ============ ATTACK ===============
     if (action === 'attack') {
-        combatState = true;
+        session.combatState = true;
         message = '';
         x = player.getX();
         y = player.getY();
@@ -349,7 +384,7 @@ bot.on('callback_query', (query) => {
         message += player.getPlayerDescription();
 
         if (liveNPCs.length == 0) {
-            combatState = false;
+            session.combatState = false;
             message +=
                 '\n' +
                 world.GetLocationText(x, y) +
@@ -357,7 +392,7 @@ bot.on('callback_query', (query) => {
                 world.printWorldMap(x, y);
         }
 
-        if (!combatState) {
+        if (!session.combatState) {
             console.log('вышли из боя');
         }
 

@@ -120,12 +120,7 @@ export class Player {
     }
 
     getLocationCoords() {
-        const playerDebug = true;
-        if (playerDebug) {
-            return 'Позиция: X = ' + (this.x + 1) + ' / Y = ' + (this.y + 1);
-        } else {
-            return '';
-        }
+        return '';
     }
 
     move(direction) {
