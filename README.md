@@ -1,4 +1,6 @@
 # Text_RPG_bot_TG
+![Скриншот игры](TextRPGbotTG.png)
+
 Текстовая RPG (MUD‑подобная) в Telegram: исследуйте процедурно сгенерированный мир, сражайтесь с монстрами, собирайте предметы и прокачивайте героя.
 
 ![node](https://img.shields.io/badge/Node.js-000?style=flat&logo=node.js&logoColor=white)
