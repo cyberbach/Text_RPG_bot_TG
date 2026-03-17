@@ -19,6 +19,7 @@ export class Player {
         this.armor = 0;
         this.experience = 0; // total XP
         this.heroLevel = 1;
+        this.visitedCells = new Set();
     }
 
     useItem(inItem) {
@@ -48,23 +49,35 @@ export class Player {
 
     addExperience(amount) {
         const add = Math.max(0, Math.floor(amount));
-        if (add === 0) return { gained: 0, leveledUp: false };
+        if (add === 0) return { gained: 0, leveledUp: false, statsGained: null };
 
         this.experience += add;
         let leveledUp = false;
+        let statsGained = null;
 
         while (this.experience >= this.getXPToNextLevel()) {
+            const oldMaxHealth = this.maxHealth;
+            const oldMinAttack = this.minAttackPower;
+            const oldMaxAttack = this.maxAttackPower;
+            
             this.heroLevel += 1;
             leveledUp = true;
 
-            // Simple scaling: grow survivability and damage a bit each level.
-            this.maxHealth += 10;
+            const hpBonus = (this.heroLevel - 1) * 10;
+            this.maxHealth += hpBonus;
             this.health = this.maxHealth;
             this.minAttackPower += 1;
             this.maxAttackPower += 2;
+
+            statsGained = {
+                hpBonus,
+                minAttackBonus: 1,
+                maxAttackBonus: 2,
+                newLevel: this.heroLevel
+            };
         }
 
-        return { gained: add, leveledUp };
+        return { gained: add, leveledUp, statsGained };
     }
 
     addExperienceForAction(baseAmount) {
@@ -121,6 +134,14 @@ export class Player {
 
     getLocationCoords() {
         return '';
+    }
+
+    markCellVisited(x, y) {
+        this.visitedCells.add(`${x},${y}`);
+    }
+
+    isCellVisited(x, y) {
+        return this.visitedCells.has(`${x},${y}`);
     }
 
     move(direction) {

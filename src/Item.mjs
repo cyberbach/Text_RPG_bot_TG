@@ -27,10 +27,17 @@ export class Item {
             this.isWeapon = true;
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
-            if (Math.random() > 0.5) {
+            
+            const damageType = Math.floor(Math.random() * 3);
+            if (damageType === 0) {
                 this.minAttackPower = 1 + Math.floor(Math.random() * 10);
-            } else {
+                this.maxAttackPower = 0;
+            } else if (damageType === 1) {
+                this.minAttackPower = 0;
                 this.maxAttackPower = 1 + Math.floor(Math.random() * 20);
+            } else {
+                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
+                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * 10);
             }
         } else {
             this.isHealing = true;
@@ -64,17 +71,33 @@ export class Item {
             this.isWeapon = true;
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
-            this.attackPower = 1 + Math.floor(Math.random() * 10);
+            
+            const damageType = Math.floor(Math.random() * 3);
+            if (damageType === 0) {
+                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
+                this.maxAttackPower = 0;
+            } else if (damageType === 1) {
+                this.minAttackPower = 0;
+                this.maxAttackPower = 1 + Math.floor(Math.random() * 20);
+            } else {
+                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
+                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * 10);
+            }
         } else {
             this.isHealing = true;
             this.isWeapon = false;
             const baseNames = Object.values(HealItemNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
-            this.health = 1 + Math.floor(Math.random() * 20);
-            this.maxHealth = Math.floor(Math.random() * 30);
+            if (Math.random() > 0.5) {
+                this.health = 1 + Math.floor(Math.random() * 20);
+            } else {
+                this.maxHealth = 1 + Math.floor(Math.random() * 30);
+            }
         }
 
-        console.log('Created Item:', this.name, ' at ', this.x, '/', this.y);
+        if (DEBUG_ITEMS_CREATION) {
+            console.log('Created Item:', this.name, ' at ', this.x, '/', this.y);
+        }
     }
 
     getItemDescription() {

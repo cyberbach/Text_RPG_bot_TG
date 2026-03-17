@@ -1,5 +1,6 @@
 export function PlayerAttackNPC(inWorld, inPlayer) {
     let attackResult = '';
+    let stats = { damageDealt: 0, monstersKilled: 0 };
     const x = inPlayer.getX();
     const y = inPlayer.getY();
 
@@ -9,6 +10,7 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
             const damageAmount = inPlayer.getAttackPower();
             const isAlive = oneNpc.modifyHealth(-damageAmount);
             inPlayer.addExperienceForAction(5);
+            stats.damageDealt += damageAmount;
             attackResult +=
                 inPlayer.name +
                 ' наносит ' +
@@ -21,8 +23,8 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
                     (npc) => npc === oneNpc
                 );
                 inWorld.npcs.splice(indexToRemove, 1);
+                stats.monstersKilled++;
                 attackResult += oneNpc.name + ' убит 💀\n';
-                // drop item
                 inWorld.generateOneItem(x, y);
             }
         } else {
@@ -31,13 +33,14 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
         }
     });
 
-    return attackResult;
+    return { text: attackResult, stats };
 }
 
-export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer) {
+export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY) {
     let attackResult = '';
-    const x = inPlayer.getX();
-    const y = inPlayer.getY();
+    let stats = { damageTaken: 0, playerDied: false };
+    const x = attackX !== undefined ? attackX : inPlayer.getX();
+    const y = attackY !== undefined ? attackY : inPlayer.getY();
 
     let isAlive = true;
 
@@ -54,6 +57,7 @@ export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer) {
                         );
 
                     isAlive = inPlayer.modifyHealth(-damageAmount);
+                    stats.damageTaken += damageAmount;
                     attackResult +=
                         oneNpc.name +
                         ' наносит ' +
@@ -63,6 +67,7 @@ export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer) {
                         '\n';
 
                     if (!isAlive) {
+                        stats.playerDied = true;
                         attackResult +=
                             inPlayer.name + ' убит 💀\n\nКОНЕЦ ИГРЫ!\n';
                     }
@@ -73,5 +78,5 @@ export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer) {
         }
     });
 
-    return attackResult;
+    return { text: attackResult, stats };
 }

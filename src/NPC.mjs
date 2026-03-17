@@ -54,8 +54,11 @@ export class NPC {
 
         let descriptionString = '';
         descriptionString += '👤 ' + this.name + ' ';
-        descriptionString += this.agressive ? ' ❤️ ' + this.health : '💚'; // ⚔️
-        descriptionString += this.agressive ? attackString : ''; // ⚔️
+        if (this.agressive) {
+            descriptionString += '❤️ ' + this.health + attackString;
+        } else {
+            descriptionString += '💚 (мирный)';
+        }
         descriptionString += '\n';
         //console.log('monster description: ' + descriptionString);
 

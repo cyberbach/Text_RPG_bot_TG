@@ -3,6 +3,7 @@ import {
     getRandomLocationDescription,
     locationIDToRussian,
 } from './LocationTypes.mjs';
+import { WORLD_NAMES } from './WorldTypes.mjs';
 import { NPC } from './NPC.mjs';
 import { Item } from './Item.mjs';
 
@@ -15,9 +16,13 @@ export class WorldGenerator {
         this.maze = [];
         this.npcs = [];
         this.items = [];
+        this.worldName = '';
     }
 
     generate() {
+        const worldNames = Object.values(WORLD_NAMES);
+        this.worldName = worldNames[Math.floor(Math.random() * worldNames.length)];
+
         const max_available_location_types =
             Object.values(LOCATION_TYPE).length;
 
@@ -43,8 +48,6 @@ export class WorldGenerator {
             newNPC.setup(this.width, this.height, excludeX, excludeY);
             this.npcs.push(newNPC);
         }
-
-        console.log('Created', this.npcs.length, ' NPC');
     }
 
     generateOneItem(x, y) {
@@ -61,8 +64,6 @@ export class WorldGenerator {
             newItem.setup(this.width, this.height, excludeX, excludeY);
             this.items.push(newItem);
         }
-
-        console.log('Created', this.items.length, '  items');
     }
 
     printWorldOnConsole() {
@@ -73,7 +74,7 @@ export class WorldGenerator {
     }
 
     printWorldMap(a, b) {
-        let resultString = '```map\n -';
+        let resultString = '```' + this.worldName + '\n -';
 
         for (let j = 0; j < this.width; j++) {
             resultString += '=-';
@@ -226,6 +227,19 @@ export class WorldGenerator {
         }
 
         return resultString;
+    }
+
+    recalculateNPCsForLevel(playerLevel) {
+        if (playerLevel <= 1) return;
+        
+        const levelBonus = playerLevel - 1;
+        
+        this.npcs.forEach(npc => {
+            npc.minAttackPower += levelBonus;
+            npc.maxAttackPower += levelBonus * 2;
+            npc.health += levelBonus * 10;
+            npc.maxHealth += levelBonus * 10;
+        });
     }
 
     getItemsText(x, y) {
