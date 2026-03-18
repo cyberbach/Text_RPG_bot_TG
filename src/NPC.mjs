@@ -1,7 +1,9 @@
 import { AdjectiveWords } from './AdjectiveWords.mjs';
 import { DEBUG_NPC_CREATION } from './GameDebug.mjs';
+import { STAT_EMOJI } from './SmileInText.mjs';
 
 export class NPC {
+    // Конструктор с инициализацией базовых параметров
     constructor() {
         this.maxHealth =
             1 +
@@ -17,6 +19,7 @@ export class NPC {
         this.name = '';
     }
 
+    // Генерация NPC в случайной позиции
     setup(worldWidth, worldHeight, excludeX, excludeY) {
         this.x = Math.floor(Math.random() * worldWidth);
         this.y = Math.floor(Math.random() * worldHeight);
@@ -48,23 +51,24 @@ export class NPC {
         }
     }
 
+    // Получение описания NPC для отображения
     getNpcDescription() {
         const attackString =
-            ' 🗡️ ' + this.minAttackPower + '..' + this.maxAttackPower;
+            ' ' + STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
 
         let descriptionString = '';
-        descriptionString += '👤 ' + this.name + ' ';
+        descriptionString += STAT_EMOJI.MONSTER + ' ' + this.name + ' ';
         if (this.agressive) {
-            descriptionString += '❤️ ' + this.health + attackString;
+            descriptionString += STAT_EMOJI.HEALTH + ' ' + this.health + attackString;
         } else {
-            descriptionString += '💚 (мирный)';
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (мирный)';
         }
         descriptionString += '\n';
-        //console.log('monster description: ' + descriptionString);
 
         return descriptionString;
     }
 
+    // Изменение здоровья (урон/лечение), NPC становится агрессивным
     modifyHealth(amount) {
         this.health += amount;
         this.agressive = true;

@@ -1,3 +1,7 @@
+import { getHitChanceModifier } from './EventSystem.mjs';
+import { STAT_EMOJI } from './SmileInText.mjs';
+
+// Атака игроком всех NPC на текущей локации
 export function playerAttackNPC(inWorld, inPlayer) {
     let attackResult = '';
     let stats = { damageDealt: 0, monstersKilled: 0, coinsGained: 0 };
@@ -5,8 +9,10 @@ export function playerAttackNPC(inWorld, inPlayer) {
     const y = inPlayer.getY();
 
     const npcs = inWorld.getNPCsAtLocation(x, y);
+    const hitChance = inPlayer.getHitChance(getHitChanceModifier());
+
     npcs.forEach((oneNpc) => {
-        if (Math.random() > 0.5) {
+        if (Math.random() * 100 < hitChance) {
             const damageAmount = inPlayer.getAttackPower();
             const isAlive = oneNpc.modifyHealth(-damageAmount);
             inPlayer.addExperienceForAction(5);
@@ -24,17 +30,16 @@ export function playerAttackNPC(inWorld, inPlayer) {
                 );
                 inWorld.npcs.splice(indexToRemove, 1);
                 stats.monstersKilled++;
-                attackResult += oneNpc.name + ' убит 💀\n';
+                attackResult += oneNpc.name + ' ' + STAT_EMOJI.KILL + '\n';
                 
                 const coinAmount = 1 + Math.floor(Math.random() * 5);
                 inPlayer.coins += coinAmount;
                 stats.coinsGained += coinAmount;
-                attackResult += 'Вы получили ' + coinAmount + ' монет 🪙\n';
+                attackResult += 'Вы получили ' + coinAmount + ' монет ' + STAT_EMOJI.COINS + '\n';
                 
                 inWorld.generateOneItem(x, y);
             }
         } else {
-            inPlayer.addExperienceForAction(1);
             attackResult += inPlayer.name + ' промахнулся\n';
         }
     });
@@ -42,6 +47,7 @@ export function playerAttackNPC(inWorld, inPlayer) {
     return { text: attackResult, stats };
 }
 
+// Атака всех агрессивных NPC по игроку
 export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY) {
     let attackResult = '';
     let stats = { damageTaken: 0, playerDied: false };
@@ -75,7 +81,7 @@ export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY)
                     if (!isAlive) {
                         stats.playerDied = true;
                         attackResult +=
-                            inPlayer.name + ' убит 💀\n\nКОНЕЦ ИГРЫ!\n';
+                            inPlayer.name + ' ' + STAT_EMOJI.KILL + '\n\nКОНЕЦ ИГРЫ!\n';
                     }
                 }
             } else {

@@ -1,6 +1,7 @@
 import { AdjectiveWords } from './AdjectiveWords.mjs';
 import { DEBUG_ITEMS_CREATION } from './GameDebug.mjs';
-import { STAT_STAT_TEXT_LABELS } from './StatTextLabels.mjs';
+import { STAT_TEXT_LABELS } from './StatTextLabels.mjs';
+import { STAT_EMOJI } from './SmileInText.mjs';
 
 export class Item {
     constructor() {
@@ -15,6 +16,7 @@ export class Item {
         this.name = '';
     }
 
+    // Генерация предмета в случайной позиции мира
     setup(worldWidth, worldHeight, excludeX, excludeY) {
         this.x = Math.floor(Math.random() * worldWidth);
         this.y = Math.floor(Math.random() * worldHeight);
@@ -65,6 +67,7 @@ export class Item {
         }
     }
 
+    // Создание предмета в конкретной позиции (после убийства монстра)
     setupAtLocation(a, b) {
         this.x = a;
         this.y = b;
@@ -111,28 +114,29 @@ export class Item {
         }
     }
 
+    // Получение описания предмета для отображения
+    // Получение описания предмета для отображения
     getItemDescription() {
         let descriptionString = '';
         descriptionString += '- ' + this.name + ' ';
         if (this.isCoin) {
-            descriptionString += '🪙 ' + this.coins + '\n';
+            descriptionString += STAT_EMOJI.COINS + ' ' + this.coins + '\n';
         } else if (this.isHealing) {
             const parts = [];
             if (this.health)
                 parts.push('+' + this.health + ' ' + STAT_TEXT_LABELS.health);
             if (this.maxHealth)
                 parts.push('+' + this.maxHealth + ' ' + STAT_TEXT_LABELS.maxHealth);
-            descriptionString += '❤️ ' + (parts.length ? parts.join(', ') : '+0');
+            descriptionString += STAT_EMOJI.HEALTH + ' ' + (parts.length ? parts.join(', ') : '+0');
         } else {
             const parts = [];
             if (this.minAttackPower)
                 parts.push('+' + this.minAttackPower + ' ' + STAT_TEXT_LABELS.minDamage);
             if (this.maxAttackPower)
                 parts.push('+' + this.maxAttackPower + ' ' + STAT_TEXT_LABELS.maxDamage);
-            descriptionString += '⚔️ ' + (parts.length ? parts.join(', ') : '+0');
+            descriptionString += STAT_EMOJI.ATTACK + ' ' + (parts.length ? parts.join(', ') : '+0');
         }
         descriptionString += '\n';
-        //console.log('monster description: ' + descriptionString);
         return descriptionString;
     }
 }

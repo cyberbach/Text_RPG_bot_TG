@@ -10,6 +10,7 @@ import { Item } from './Item.mjs';
 export class WorldGenerator {
     constructor() {}
 
+    // Инициализация параметров мира
     setup(width, height) {
         this.width = width;
         this.height = height;
@@ -19,6 +20,7 @@ export class WorldGenerator {
         this.worldName = '';
     }
 
+    // Генерация мира (имя + лабиринт с типами локаций)
     generate() {
         const worldNames = Object.values(WORLD_NAMES);
         this.worldName = worldNames[Math.floor(Math.random() * worldNames.length)];
@@ -40,6 +42,7 @@ export class WorldGenerator {
         }
     }
 
+    // Генерация всех NPC мира
     generateNPC(excludeX, excludeY) {
         // Расстановка NPC
         const maxNPCCount = this.height * this.width * 1.3;
@@ -50,12 +53,14 @@ export class WorldGenerator {
         }
     }
 
+    // Создание одного предмета в указанной позиции
     generateOneItem(x, y) {
         const newItem = new Item();
         newItem.setupAtLocation(x, y);
         this.items.push(newItem);
     }
 
+    // Генерация всех предметов мира
     generateItems(excludeX, excludeY) {
         // Расстановка Items
         const maxItemsCount = this.height * this.width * 1.1;
@@ -66,6 +71,7 @@ export class WorldGenerator {
         }
     }
 
+    // Вывод мира в консоль (для отладки)
     printWorldOnConsole() {
         // Вывод лабиринта в консоль
         for (const row of this.maze) {
@@ -73,6 +79,7 @@ export class WorldGenerator {
         }
     }
 
+    // Формирование ASCII-карты мира для отображения в Telegram
     printWorldMap(a, b) {
         let resultString = '```' + this.worldName + '\n -';
 
@@ -139,6 +146,7 @@ export class WorldGenerator {
         return resultString;
     }
 
+    // Получение типа локации по координатам
     getLocationByXY(b, a) {
         // Проверка, что индексы a и b находятся в допустимом диапазоне
         if (a >= 0 && a < this.height && b >= 0 && b < this.width) {
@@ -151,6 +159,7 @@ export class WorldGenerator {
         }
     }
 
+    // Получение описания локации по координатам
     getLocationDescriptionByXY(b, a) {
         // Проверка, что индексы a и b находятся в допустимом диапазоне
         if (a >= 0 && a < this.height && b >= 0 && b < this.width) {
@@ -164,6 +173,7 @@ export class WorldGenerator {
         }
     }
 
+    // Получение доступных направлений движения
     getAvailableDirections(a, b) {
         let resultArray = [];
         if (a > 0) resultArray.push('move_left');
@@ -174,6 +184,7 @@ export class WorldGenerator {
         return resultArray;
     }
 
+    // Получение доступных действий (атака/подбор) на локации
     getAvailableActions(a, b) {
         let resultArray = [];
 
@@ -204,6 +215,18 @@ export class WorldGenerator {
         return foundNPCs;
     }
 
+    // Получение всех NPC на локации
+    getNPCsAtLocation(a, b) {
+        const foundNPCs = [];
+        this.npcs.forEach((npc) => {
+            if (npc.x === a && npc.y === b) {
+                foundNPCs.push(npc);
+            }
+        });
+        return foundNPCs;
+    }
+
+    // Получение всех предметов на локации
     getItemsAtLocation(a, b) {
         const foundItems = [];
         this.items.forEach((item) => {
@@ -214,6 +237,7 @@ export class WorldGenerator {
         return foundItems;
     }
 
+    // Формирование текстового описания NPC для отображения
     getNPCsText(x, y) {
         let resultString = '';
         const npcObjectsToDisplay = this.getNPCsAtLocation(x, y);
@@ -242,6 +266,21 @@ export class WorldGenerator {
         });
     }
 
+    // Пересчет характеристик NPC в зависимости от уровня игрока
+    recalculateNPCsForLevel(playerLevel) {
+        if (playerLevel <= 1) return;
+        
+        const levelBonus = playerLevel - 1;
+        
+        this.npcs.forEach(npc => {
+            npc.minAttackPower += levelBonus;
+            npc.maxAttackPower += levelBonus * 2;
+            npc.health += levelBonus * 10;
+            npc.maxHealth += levelBonus * 10;
+        });
+    }
+
+    // Формирование текстового описания предметов для отображения
     getItemsText(x, y) {
         let resultString = '';
         const itemsToDisplay = this.getItemsAtLocation(x, y);
@@ -257,6 +296,7 @@ export class WorldGenerator {
         return resultString;
     }
 
+    // Формирование полного описания локации (название + описание + NPC + предметы)
     GetLocationText(x, y) {
         const locationName = this.getLocationByXY(x, y).toUpperCase();
         //const locationNameString = locationName.toUpperCase();

@@ -8,6 +8,8 @@ import { Player } from './src/Player.mjs';
 import { allAgressiveNPCAttackPlayer, playerAttackNPC } from './src/Game.mjs';
 import { DIRECTIONS } from './src/MovementDirections.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
+import { initEvent, getCurrentEventName, tickEventDuration, getHitChanceModifier } from './src/EventSystem.mjs';
+import { STAT_EMOJI } from './src/SmileInText.mjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -46,6 +48,7 @@ const globalStats = {
     totalCoins: 0,
 };
 
+// Обновление глобальной статистики (для всех игроков)
 function updateGlobalStats(options) {
     if (options.damageDealt) globalStats.totalDamageDealt += options.damageDealt;
     if (options.damageTaken) globalStats.totalDamageTaken += options.damageTaken;
@@ -65,28 +68,30 @@ function updateGlobalStats(options) {
     }
 }
 
+// Формирование сообщения со статистикой
 function getGlobalStatsMessage(playerStats) {
     return `📊 *ГЛОБАЛЬНАЯ СТАТИСТИКА*\n\n` +
-        `🎮 Всего игр начато: ${globalStats.totalGamesStarted}\n` +
-        `👤 Уникальных игроков: ${globalStats.uniquePlayers.size}\n` +
-        `🗺️ Миров создано: ${globalStats.worldsVisited.size}\n` +
-        `✅ Игр пройдено: ${globalStats.gamesCompleted}\n` +
-        `⚔️ Всего урона нанесено: ${globalStats.totalDamageDealt}\n` +
-        `🛡️ Всего урона получено: ${globalStats.totalDamageTaken}\n` +
-        `💀 Всего монстров убито: ${globalStats.monstersKilled}\n` +
-        `💎 Всего предметов найдено: ${globalStats.itemsFound}\n` +
-        `🪙 Всего монет: ${globalStats.totalCoins}\n` +
-        `⭐️ Максимальный уровень: ${globalStats.maxHeroLevel}\n\n` +
+        `${STAT_EMOJI.GAME} Всего игр начато: ${globalStats.totalGamesStarted}\n` +
+        `${STAT_EMOJI.MONSTER} Уникальных игроков: ${globalStats.uniquePlayers.size}\n` +
+        `${STAT_EMOJI.WORLD_MAP} Миров создано: ${globalStats.worldsVisited.size}\n` +
+        `${STAT_EMOJI.CHECK} Игр пройдено: ${globalStats.gamesCompleted}\n` +
+        `${STAT_EMOJI.ATTACK} Всего урона нанесено: ${globalStats.totalDamageDealt}\n` +
+        `${STAT_EMOJI.ARMOR} Всего урона получено: ${globalStats.totalDamageTaken}\n` +
+        `${STAT_EMOJI.KILL} Всего монстров убито: ${globalStats.monstersKilled}\n` +
+        `${STAT_EMOJI.ITEMS} Всего предметов найдено: ${globalStats.itemsFound}\n` +
+        `${STAT_EMOJI.COINS} Всего монет: ${globalStats.totalCoins}\n` +
+        `${STAT_EMOJI.LEVEL} Максимальный уровень: ${globalStats.maxHeroLevel}\n\n` +
         `📈 *СТАТИСТИКА ИГРОКА*\n\n` +
-        `✅ Игр пройдено: ${playerStats.gamesCompleted}\n` +
-        `⚔️ Нанесено урона: ${playerStats.totalDamageDealt}\n` +
-        `🛡️ Получено урона: ${playerStats.totalDamageTaken}\n` +
-        `💀 Убито монстров: ${playerStats.monstersKilled}\n` +
-        `💎 Найдено предметов: ${playerStats.itemsFound}\n` +
-        `🪙 Монет: ${playerStats.totalCoins}\n` +
-        `⭐️ Максимальный уровень: ${playerStats.maxHeroLevel}`;
+        `${STAT_EMOJI.CHECK} Игр пройдено: ${playerStats.gamesCompleted}\n` +
+        `${STAT_EMOJI.ATTACK} Нанесено урона: ${playerStats.totalDamageDealt}\n` +
+        `${STAT_EMOJI.ARMOR} Получено урона: ${playerStats.totalDamageTaken}\n` +
+        `${STAT_EMOJI.KILL} Убито монстров: ${playerStats.monstersKilled}\n` +
+        `${STAT_EMOJI.ITEMS} Найдено предметов: ${playerStats.itemsFound}\n` +
+        `${STAT_EMOJI.COINS} Монет: ${playerStats.totalCoins}\n` +
+        `${STAT_EMOJI.LEVEL} Максимальный уровень: ${playerStats.maxHeroLevel}`;
 }
 
+// Обновление статистики текущего игрока
 function updatePlayerStats(session, options) {
     const ps = session.playerStats;
     if (options.damageDealt) ps.totalDamageDealt += options.damageDealt;
@@ -104,6 +109,7 @@ function updatePlayerStats(session, options) {
 // Different chats can play simultaneously without interfering.
 const sessions = new Map();
 
+// Создание новой игровой сессии для чата
 function createNewSession(chatId) {
     const session = {
         chatId,
@@ -125,10 +131,12 @@ function createNewSession(chatId) {
     return session;
 }
 
+// Получение существующей сессии или создание новой
 function getSession(chatId) {
     return sessions.get(chatId) ?? createNewSession(chatId);
 }
 
+// Настройка новой игры (генерация мира, игрока)
 function setupNewGame(session, { width, height, playerName, mode }) {
     session.mode = mode;
     session.combatState = false;
@@ -139,6 +147,8 @@ function setupNewGame(session, { width, height, playerName, mode }) {
     session.player.setup(width, height, playerName);
     session.player.clearAttributes();
     session.player.setRandomLocation();
+
+    initEvent();
 
     const x = session.player.getX();
     const y = session.player.getY();
@@ -199,6 +209,7 @@ try {
     process.exit(1);
 }
 
+// Генерация Inline-кнопок для навигации и действий
 function generateInlineButtons(availableDirections, availableActions) {
     // Фильтруем кнопки по доступным направлениям
     const generatedMoveButtons = [];
@@ -232,6 +243,7 @@ function generateInlineButtons(availableDirections, availableActions) {
     };
 }
 
+// Генерация кнопки "Новая игра" после смерти игрока
 function generateDeathButtons() {
     return {
         parse_mode: 'Markdown',
@@ -260,7 +272,7 @@ bot.onText(/\/start/, (msg) => {
     );
 
     const message =
-        `⚔️ Добро пожаловать в *Текстовое Приключение!* ⚔️\n\n` +
+        `${STAT_EMOJI.ATTACK} Добро пожаловать в *Текстовое Приключение!* ${STAT_EMOJI.ATTACK}\n\n` +
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
@@ -290,7 +302,7 @@ bot.onText(/\/pc/, (msg) => {
     );
 
     const message =
-        `⚔️ Добро пожаловать в *Текстовое Приключение!* ⚔️\n\n` +
+        `${STAT_EMOJI.ATTACK} Добро пожаловать в *Текстовое Приключение!* ${STAT_EMOJI.ATTACK}\n\n` +
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
@@ -326,7 +338,7 @@ bot.onText(/\/help/, (msg) => {
     );
 
     const message =
-        `⚔️ *Добро пожаловать в Текстовое Подземелье!*\n\n` +
+        `${STAT_EMOJI.ATTACK} *Добро пожаловать в Текстовое Подземелье!*\n\n` +
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
@@ -395,7 +407,7 @@ bot.on('callback_query', (query) => {
         );
 
         const message =
-            `⚔️ Новая игра началась! ⚔️\n\n` +
+            `${STAT_EMOJI.ATTACK} Новая игра началась! ${STAT_EMOJI.ATTACK}\n\n` +
             session.world.GetLocationText(px, py) +
             session.player.getLocationCoords() +
             session.world.printWorldMap(px, py);
@@ -457,9 +469,9 @@ bot.on('callback_query', (query) => {
             message += 'Нельзя идти туда.\n\n';
             const expResult = player.addExperienceForAction(1);
             if (expResult.leveledUp && expResult.statsGained) {
-                message += `🎉 *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                message += `❤️ Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                message += `🗡️ Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
+                message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
             }
 
             message +=
@@ -486,9 +498,9 @@ bot.on('callback_query', (query) => {
             
             const expResult = player.addExperienceForAction(1);
             if (expResult.leveledUp && expResult.statsGained) {
-                message += `🎉 *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                message += `❤️ Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                message += `🗡️ Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
+                message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
             }
 
             if (agressiveNPCsOnOldLocation.length > 0) {
@@ -500,7 +512,7 @@ bot.on('callback_query', (query) => {
                 if (npcAttackResult.stats.playerDied) {
                     updateGlobalStats({ gameCompleted: true });
                     updatePlayerStats(session, { gameCompleted: true });
-                    message += '\n☠️ ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+                    message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
                 } else {
                     message += player.getPlayerDescription() + '\n';
                 }
@@ -517,12 +529,16 @@ bot.on('callback_query', (query) => {
                 player.markCellVisited(x, y);
             }
 
+            tickEventDuration();
+
             const locationMessage =
                 world.GetLocationText(x, y) +
                 player.getLocationCoords() +
                 world.printWorldMap(x, y);
 
-            message += `Вы перешли на ${directionName}.\n\n` + locationMessage;
+            const hitChance = player.getHitChance(getHitChanceModifier());
+            const weatherInfo = `${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
+            message += `Вы перешли на ${directionName}. ${weatherInfo}\n\n` + locationMessage;
 
             const buttons = isPlayerDied 
                 ? generateDeathButtons()
@@ -591,7 +607,7 @@ bot.on('callback_query', (query) => {
                 isPlayerDied = true;
                 updateGlobalStats({ gameCompleted: true });
                 updatePlayerStats(session, { gameCompleted: true });
-                message += '\n☠️ ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+                message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
             } else {
                 message += player.getPlayerDescription() + '\n';
             }
@@ -657,7 +673,7 @@ bot.on('callback_query', (query) => {
             updateGlobalStats({ gameCompleted: true });
             updatePlayerStats(session, { gameCompleted: true });
             session.combatState = false;
-            message += '\n☠️ ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+            message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
         }
 
         message += '\n';
