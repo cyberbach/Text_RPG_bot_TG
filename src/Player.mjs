@@ -26,6 +26,9 @@ export class Player {
         if (inItem.isWeapon) {
             this.minAttackPower += inItem.minAttackPower;
             this.maxAttackPower += inItem.maxAttackPower;
+            if (this.minAttackPower > this.maxAttackPower) {
+                this.maxAttackPower = this.minAttackPower;
+            }
         }
         if (inItem.isHealing) {
             this.maxHealth += inItem.maxHealth;

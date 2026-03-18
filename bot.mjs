@@ -42,6 +42,7 @@ const globalStats = {
     maxHeroLevel: 1,
     uniquePlayers: new Set(),
     worldsVisited: new Set(),
+    totalGamesStarted: 0,
 };
 
 function updateGlobalStats(options) {
@@ -50,6 +51,7 @@ function updateGlobalStats(options) {
     if (options.monsterKilled) globalStats.monstersKilled++;
     if (options.itemFound) globalStats.itemsFound++;
     if (options.gameCompleted) globalStats.gamesCompleted++;
+    if (options.gamesStarted) globalStats.totalGamesStarted += options.gamesStarted;
     if (options.heroLevel && options.heroLevel > globalStats.maxHeroLevel) {
         globalStats.maxHeroLevel = options.heroLevel;
     }
@@ -63,9 +65,16 @@ function updateGlobalStats(options) {
 
 function getGlobalStatsMessage(playerStats) {
     return `📊 *ГЛОБАЛЬНАЯ СТАТИСТИКА*\n\n` +
+        `🎮 Всего игр начато: ${globalStats.totalGamesStarted}\n` +
         `👤 Уникальных игроков: ${globalStats.uniquePlayers.size}\n` +
-        `🗺️ Игроки посетили миров: ${globalStats.worldsVisited.size}\n\n` +
-        `📊 *ВАША СТАТИСТИКА*\n\n` +
+        `🗺️ Миров создано: ${globalStats.worldsVisited.size}\n` +
+        `✅ Игр пройдено: ${globalStats.gamesCompleted}\n` +
+        `⚔️ Всего урона нанесено: ${globalStats.totalDamageDealt}\n` +
+        `🛡️ Всего урона получено: ${globalStats.totalDamageTaken}\n` +
+        `💀 Всего монстров убито: ${globalStats.monstersKilled}\n` +
+        `💎 Всего предметов найдено: ${globalStats.itemsFound}\n` +
+        `⭐️ Максимальный уровень: ${globalStats.maxHeroLevel}\n\n` +
+        `📈 *СТАТИСТИКА ИГРОКА*\n\n` +
         `✅ Игр пройдено: ${playerStats.gamesCompleted}\n` +
         `⚔️ Нанесено урона: ${playerStats.totalDamageDealt}\n` +
         `🛡️ Получено урона: ${playerStats.totalDamageTaken}\n` +
@@ -237,7 +246,7 @@ bot.onText(/\/start/, (msg) => {
         mode: 'mobile',
     });
     console.log(`Игрок ${msg.from.first_name} (ID: ${msg.chat.id}) сгенерировал карту ${WORLD_MOBILE_WIDTH}x${WORLD_MOBILE_HEIGHT}`);
-    updateGlobalStats({ playerId: msg.chat.id, worldName: session.world.worldName });
+    updateGlobalStats({ playerId: msg.chat.id, worldName: session.world.worldName, gamesStarted: 1 });
 
     const buttons = generateInlineButtons(
         session.world.getAvailableDirections(x, y),
@@ -267,6 +276,7 @@ bot.onText(/\/pc/, (msg) => {
         mode: 'pc',
     });
     console.log(`Игрок ${msg.from.first_name} (ID: ${msg.chat.id}) сгенерировал карту ${WORLD_PC_WIDTH}x${WORLD_PC_HEIGHT}`);
+    updateGlobalStats({ playerId: msg.chat.id, worldName: session.world.worldName, gamesStarted: 1 });
 
     const buttons = generateInlineButtons(
         session.world.getAvailableDirections(x, y),
@@ -366,6 +376,12 @@ bot.on('callback_query', (query) => {
         session.world.generateItems(px, py);
         session.player.markCellVisited(px, py);
 
+        updateGlobalStats({ 
+            playerId: currentChatID, 
+            worldName: session.world.worldName, 
+            gamesStarted: 1 
+        });
+
         const buttons = generateInlineButtons(
             session.world.getAvailableDirections(px, py),
             session.world.getAvailableActions(px, py)
@@ -434,10 +450,9 @@ bot.on('callback_query', (query) => {
             message += 'Нельзя идти туда.\n\n';
             const expResult = player.addExperienceForAction(1);
             if (expResult.leveledUp && expResult.statsGained) {
-                message += `🎉 *НОВЫЙ УРОВЕНЬ ${expResult.statsGained.newLevel}!*\n`;
-                message += `❤️ +${expResult.statsGained.hpBonus} максимального здоровья\n`;
-                message += `🗡️ +${expResult.statsGained.minAttackBonus} мин. урона\n`;
-                message += `⚔️ +${expResult.statsGained.maxAttackBonus} макс. урона\n\n`;
+                message += `🎉 *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                message += `❤️ Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                message += `🗡️ Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
             }
 
             message +=
@@ -464,10 +479,9 @@ bot.on('callback_query', (query) => {
             
             const expResult = player.addExperienceForAction(1);
             if (expResult.leveledUp && expResult.statsGained) {
-                message += `🎉 *НОВЫЙ УРОВЕНЬ ${expResult.statsGained.newLevel}!*\n`;
-                message += `❤️ +${expResult.statsGained.hpBonus} максимального здоровья\n`;
-                message += `🗡️ +${expResult.statsGained.minAttackBonus} мин. урона\n`;
-                message += `⚔️ +${expResult.statsGained.maxAttackBonus} макс. урона\n\n`;
+                message += `🎉 *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                message += `❤️ Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                message += `🗡️ Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
             }
 
             if (agressiveNPCsOnOldLocation.length > 0) {
