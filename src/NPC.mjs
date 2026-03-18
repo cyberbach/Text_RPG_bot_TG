@@ -1,7 +1,8 @@
 import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
-import { DEBUG_NPC_CREATION, NPC_SETTINGS, QUEST_SETTINGS, NPC_TEXT } from './GameSetup.mjs';
+import { DEBUG_NPC_CREATION, NPC_SETTINGS, QUEST_SETTINGS } from './GameSetup.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 import { MonsterNames } from './TextEnums/MonsterNames.mjs';
+import { NPC_TEXT } from './TextEnums/NPCTextLabels.mjs';
 
 export const NPC_TYPE = Object.freeze({
     MONSTER: 'monster',

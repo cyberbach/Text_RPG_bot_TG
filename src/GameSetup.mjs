@@ -1,6 +1,7 @@
 // Настройки игры и отладки
 
 export const DEBUG_GAME = false;
+export const DEBUG_SHOW_TUTORIAL_TO_NEW_PLAYER = false;
 export const DEBUG_NPC_CREATION = false;
 export const DEBUG_ITEMS_CREATION = false;
 export const DEBUG_MERCHANT_QUEST_SPAWN = false;
@@ -53,7 +54,7 @@ export const NPC_SETTINGS = Object.freeze({
     // Базовые статы
     BASE_HEALTH: Object.freeze({
         MIN: 1,
-        MAX: 100,
+        MAX: 20,
     }),
     BASE_ARMOR: 50,
 
@@ -106,7 +107,7 @@ export const PLAYER_SETTINGS = Object.freeze({
     BASE_MIN_ATTACK: 1,
     BASE_MAX_ATTACK: 10,
     BASE_ARMOR: 0,
-    BASE_HIT_CHANCE: 50,
+    BASE_HIT_CHANCE: 80,
     HIT_CHANCE_BONUS_PER_LEVEL: 2,
     XP_BASE_MULTIPLIER: 50,
     HEALTH_BONUS_PER_LEVEL: 10,
@@ -114,24 +115,4 @@ export const PLAYER_SETTINGS = Object.freeze({
         MIN: 1,
         MAX: 2,
     }),
-});
-
-// Текстовые константы для NPC
-export const NPC_TEXT = Object.freeze({
-    MERCHANT_ASKING: 'продавец просит ',
-    MONET_SUFFIX: ' монет)',
-    QUEST_NEED_HELP: 'просит помочь)',
-    PEACEFUL: 'мирный)',
-});
-
-// Текстовые константы для предметов
-export const ITEM_TEXT = Object.freeze({
-    COIN_NAMES: Object.freeze({
-        ONE: 'Монета',
-        FEW: 'Монеты',
-        MANY: 'Монет',
-    }),
-    PREFIX: '- ',
-    SEPARATOR: ' ',
-    NO_BONUS: '+0',
 });

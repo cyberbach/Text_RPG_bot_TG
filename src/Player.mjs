@@ -67,7 +67,22 @@ export class Player {
             this.modifyHealth(inItem.health);
         }
 
-        return { text: PLAYER_TEXT.PICKED_ITEM + inItem.name + PLAYER_TEXT.ITEM_SUFFIX, coinsGained };
+        const bonuses = [];
+        if (inItem.minAttackPower > 0) {
+            bonuses.push(`${STAT_EMOJI.ATTACK} +${inItem.minAttackPower} мин. Урон`);
+        }
+        if (inItem.maxAttackPower > 0) {
+            bonuses.push(`+${inItem.maxAttackPower} макс. Урон`);
+        }
+        if (inItem.health > 0) {
+            bonuses.push(`${STAT_EMOJI.HEALTH} +${inItem.health} Здоровья`);
+        }
+        if (inItem.maxHealth > 0) {
+            bonuses.push(`+${inItem.maxHealth} макс. Здоровья`);
+        }
+
+        const bonusText = bonuses.length > 0 ? ' ' + bonuses.join(', ') : '';
+        return { text: PLAYER_TEXT.PICKED_ITEM + inItem.name + bonusText + '\n', coinsGained };
     }
 
     // Расчет требуемого опыта для уровня (статический метод)
@@ -92,10 +107,10 @@ export class Player {
         let statsGained = null;
 
         while (this.experience >= this.getXPToNextLevel()) {
-            const hpBonus = (this.heroLevel - 1) * PLAYER_SETTINGS.HEALTH_BONUS_PER_LEVEL;
             this.heroLevel += 1;
             leveledUp = true;
 
+            const hpBonus = this.heroLevel * PLAYER_SETTINGS.HEALTH_BONUS_PER_LEVEL;
             this.maxHealth += hpBonus;
             this.health = this.maxHealth;
             this.minAttackPower += PLAYER_SETTINGS.ATTACK_BONUS_PER_LEVEL.MIN;
@@ -141,7 +156,7 @@ export class Player {
     // Получение описания игрока (для отображения в сообщении)
     getPlayerDescription() {
         if (this.health > 0) {
-            const healthString = PLAYER_TEXT.DIVIDER + STAT_EMOJI.HEALTH + ' ' + this.health + PLAYER_TEXT.DIVIDER + this.maxHealth;
+            const healthString = ' ' + STAT_EMOJI.HEALTH + ' ' + this.health + PLAYER_TEXT.DIVIDER + this.maxHealth;
             const attackString = STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
             const xpNext = this.getXPToNextLevel();
             const xpString = STAT_EMOJI.EXPERIENCE + ' ' + this.experience + PLAYER_TEXT.DIVIDER + xpNext + PLAYER_TEXT.LEVEL_PREFIX + this.heroLevel + PLAYER_TEXT.LEVEL_SUFFIX;

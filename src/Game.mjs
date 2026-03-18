@@ -15,7 +15,6 @@ export function playerAttackNPC(inWorld, inPlayer) {
         if (Math.random() * 100 < hitChance) {
             const damageAmount = inPlayer.getAttackPower();
             const isAlive = oneNpc.modifyHealth(-damageAmount);
-            inPlayer.addExperienceForAction(5);
             stats.damageDealt += damageAmount;
             attackResult +=
                 inPlayer.name +
@@ -58,31 +57,29 @@ export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY)
 
     const npcs = inWorld.getNPCsAtLocation(x, y);
     npcs.forEach((oneNpc) => {
-        if (isAlive) {
+        if (isAlive && oneNpc.isAggressive()) {
             if (Math.random() > 0.5) {
-                if (oneNpc.agressive) {
-                    const damageAmount =
-                        Math.min(oneNpc.minAttackPower, oneNpc.maxAttackPower) +
-                        Math.floor(
-                            Math.random() *
-                                (Math.abs(oneNpc.maxAttackPower - oneNpc.minAttackPower) + 1)
-                        );
+                const damageAmount =
+                    Math.min(oneNpc.minAttackPower, oneNpc.maxAttackPower) +
+                    Math.floor(
+                        Math.random() *
+                            (Math.abs(oneNpc.maxAttackPower - oneNpc.minAttackPower) + 1)
+                    );
 
-                    isAlive = inPlayer.modifyHealth(-damageAmount);
-                    stats.damageTaken += damageAmount;
+                isAlive = inPlayer.modifyHealth(-damageAmount);
+                stats.damageTaken += damageAmount;
+                attackResult +=
+                    oneNpc.name +
+                    ' наносит ' +
+                    damageAmount +
+                    ' урона ' +
+                    inPlayer.name +
+                    '\n';
+
+                if (!isAlive) {
+                    stats.playerDied = true;
                     attackResult +=
-                        oneNpc.name +
-                        ' наносит ' +
-                        damageAmount +
-                        ' урона ' +
-                        inPlayer.name +
-                        '\n';
-
-                    if (!isAlive) {
-                        stats.playerDied = true;
-                        attackResult +=
-                            inPlayer.name + ' ' + STAT_EMOJI.KILL + '\n\nКОНЕЦ ИГРЫ!\n';
-                    }
+                        inPlayer.name + ' ' + STAT_EMOJI.KILL + '\n\nКОНЕЦ ИГРЫ!\n';
                 }
             } else {
                 attackResult += oneNpc.name + ' промахнулся\n';

@@ -432,7 +432,7 @@ export class WorldGenerator {
     }
 
     // Формирование полного описания локации (название + описание + NPC + предметы)
-    GetLocationText(x, y) {
+    GetLocationText(x, y, player = null) {
         const locationName = this.getLocationByXY(x, y).toUpperCase();
         const locationDescription = this.getLocationDescriptionByXY(x, y);
 
@@ -445,6 +445,14 @@ export class WorldGenerator {
         messageLocation += this.getNPCsText(x, y);
         messageLocation += this.getPortalsText(x, y);
         messageLocation += this.getItemsText(x, y);
+
+        if (player) {
+            const npcs = this.getNPCsAtLocation(x, y);
+            const hasHostileNPCs = npcs.some(npc => npc.isAggressive());
+            if (hasHostileNPCs) {
+                messageLocation += player.getPlayerDescription() + '\n';
+            }
+        }
 
         return messageLocation;
     }

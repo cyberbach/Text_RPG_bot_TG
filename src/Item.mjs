@@ -3,7 +3,8 @@ import { STAT_TEXT_LABELS } from './TextEnums/StatTextLabels.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 import { WeaponNames } from './TextEnums/WeaponNames.mjs';
 import { HealItemNames } from './TextEnums/HealItemNames.mjs';
-import { DEBUG_ITEMS_CREATION, ITEM_SETTINGS, ITEM_TEXT } from './GameSetup.mjs';
+import { DEBUG_ITEMS_CREATION, ITEM_SETTINGS } from './GameSetup.mjs';
+import { ITEM_TEXT } from './TextEnums/ItemTextLabels.mjs';
 
 export class Item {
     constructor() {

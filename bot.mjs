@@ -303,7 +303,7 @@ bot.onText(/\/start/, (msg) => {
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        session.world.GetLocationText(x, y) +
+        session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
         session.world.printWorldMap(x, y);
 
@@ -333,7 +333,7 @@ bot.onText(/\/pc/, (msg) => {
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        session.world.GetLocationText(x, y) +
+        session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
         session.world.printWorldMap(x, y);
 
@@ -369,7 +369,7 @@ bot.onText(/\/help/, (msg) => {
         msg.from.first_name +
         `, вы - отважный искатель приключений в мрачном мире. Ваша цель - исследовать руины, ` +
         `сражаться с монстрами и находить сокровища.\n\n` +
-        session.world.GetLocationText(x, y) +
+        session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
         session.world.printWorldMap(x, y);
 
@@ -459,7 +459,7 @@ bot.on('callback_query', (query) => {
 
         const message =
             `${STAT_EMOJI.ATTACK} Новая игра началась! ${STAT_EMOJI.ATTACK}\n\n` +
-            session.world.GetLocationText(px, py) +
+            session.world.GetLocationText(px, py, session.player) +
             session.player.getLocationCoords() +
             session.world.printWorldMap(px, py);
 
@@ -526,7 +526,7 @@ bot.on('callback_query', (query) => {
             }
 
             message +=
-                world.GetLocationText(x, y) +
+                world.GetLocationText(x, y, player) +
                 player.getLocationCoords() +
                 world.printWorldMap(x, y);
 
@@ -545,15 +545,10 @@ bot.on('callback_query', (query) => {
             }
         } else {
             const npcsOnOldLocation = world.getNPCsAtLocation(oldX, oldY);
-            const agressiveNPCsOnOldLocation = npcsOnOldLocation.filter(npc => npc.agressive);
+            const agressiveNPCsOnOldLocation = npcsOnOldLocation.filter(npc => npc.isAggressive());
             
-            const expResult = player.addExperienceForAction(1);
-            if (expResult.leveledUp && expResult.statsGained) {
-                message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
-            }
-
+            let isPlayerDied = false;
+            
             if (agressiveNPCsOnOldLocation.length > 0) {
                 const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, oldX, oldY);
                 message += npcAttackResult.text;
@@ -561,18 +556,11 @@ bot.on('callback_query', (query) => {
                 updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
                 
                 if (npcAttackResult.stats.playerDied) {
+                    isPlayerDied = true;
                     updateGlobalStats({ gameCompleted: true, death: true });
                     updatePlayerStats(session, { gameCompleted: true, death: true });
                     message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-                } else {
-                    message += player.getPlayerDescription() + '\n';
                 }
-            }
-
-            let isPlayerDied = false;
-            if (agressiveNPCsOnOldLocation.length > 0) {
-                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, oldX, oldY);
-                isPlayerDied = npcAttackResult.stats.playerDied;
             }
 
             if (!player.isCellVisited(x, y)) {
@@ -580,16 +568,21 @@ bot.on('callback_query', (query) => {
                 player.markCellVisited(x, y);
             }
 
-            tickEventDuration();
+            const weatherChanged = tickEventDuration();
 
             const locationMessage =
-                world.GetLocationText(x, y) +
+                world.GetLocationText(x, y, player) +
                 player.getLocationCoords() +
                 world.printWorldMap(x, y);
-
-            const hitChance = player.getHitChance(getHitChanceModifier());
-            const weatherInfo = `${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
-            message += `Вы перешли на ${directionName}. ${weatherInfo}\n\n` + locationMessage;
+            
+            let moveMessage = `Вы перешли на ${directionName}`;
+            if (weatherChanged) {
+                const hitChance = player.getHitChance(getHitChanceModifier());
+                moveMessage += `. ${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
+            }
+            moveMessage += '\n\n';
+            
+            message += moveMessage + locationMessage;
 
             const buttons = isPlayerDied 
                 ? generateDeathButtons()
@@ -620,7 +613,7 @@ bot.on('callback_query', (query) => {
         if (itemsToUse.length === 0) {
             message =
                 'На локации нет предметов.\n\n' +
-                world.GetLocationText(x, y) +
+                world.GetLocationText(x, y, player) +
                 player.getLocationCoords() +
                 world.printWorldMap(x, y);
 
@@ -637,18 +630,27 @@ bot.on('callback_query', (query) => {
             itemsToUse[Math.floor(Math.random() * itemsToUse.length)];
         const useResult = player.useItem(oneItemToUse);
         message = useResult.text;
-        player.addExperienceForAction(1);
+        
+        const expResult = player.addExperienceForAction(1);
+        message += `✨ Опыт: +${expResult.gained}\n`;
+        if (expResult.leveledUp && expResult.statsGained) {
+            message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+            message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+            message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
+        }
+        message += '\n' + player.getPlayerDescription();
+        
         const indexToRemove = world.items.findIndex(
             (item) => item === oneItemToUse
         );
         world.items.splice(indexToRemove, 1);
         updateGlobalStats({ itemFound: true, heroLevel: player.heroLevel });
         updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel, coinsGained: useResult.coinsGained });
-        message += player.getPlayerDescription() + '\n';
 
         const npcsAtLocation = world.getNPCsAtLocation(x, y);
-        const agressiveNPCs = npcsAtLocation.filter(npc => npc.agressive);
+        const agressiveNPCs = npcsAtLocation.filter(npc => npc.isAggressive());
         let isPlayerDied = false;
+        
         if (agressiveNPCs.length > 0) {
             const npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
             message += '\n' + npcAttackResult.text;
@@ -660,14 +662,11 @@ bot.on('callback_query', (query) => {
                 updateGlobalStats({ gameCompleted: true, death: true });
                 updatePlayerStats(session, { gameCompleted: true, death: true });
                 message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-            } else {
-                message += player.getPlayerDescription() + '\n';
             }
         }
 
-        message +=
-            '\n' +
-            world.GetLocationText(x, y) +
+        message += '\n' +
+            world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
             world.printWorldMap(x, y);
 
@@ -728,32 +727,40 @@ bot.on('callback_query', (query) => {
 
         updateGlobalStats({
             damageDealt: playerAttackResult.stats.damageDealt,
-            monsterKilled: playerAttackResult.stats.monstersKilled > 0,
             damageTaken: npcAttackResult.stats.damageTaken,
             coinsGained: playerAttackResult.stats.coinsGained,
         });
-        updateGlobalStats({ heroLevel: player.heroLevel });
         updatePlayerStats(session, {
             damageDealt: playerAttackResult.stats.damageDealt,
-            monsterKilled: playerAttackResult.stats.monstersKilled > 0,
             damageTaken: npcAttackResult.stats.damageTaken,
-            heroLevel: player.heroLevel,
             coinsGained: playerAttackResult.stats.coinsGained,
         });
 
         message += '\n';
         let liveNPCs = world.getNPCsAtLocation(x, y);
-        liveNPCs.forEach((npc) => {
-            message += npc.getNpcDescription();
-        });
-        message += player.getPlayerDescription() + '\n';
 
         if (liveNPCs.length == 0) {
             session.combatState = false;
-            message +=
-                '\n' +
-                world.GetLocationText(x, y) +
+            
+            if (playerAttackResult.stats.monstersKilled > 0) {
+                const xpGained = playerAttackResult.stats.monstersKilled * 5;
+                const expResult = player.addExperienceForAction(xpGained);
+                message += `✨ Опыт за убитых врагов: +${expResult.gained}\n`;
+                if (expResult.leveledUp && expResult.statsGained) {
+                    message += `\n${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                    message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                    message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
+                }
+                updateGlobalStats({ monsterKilled: true, heroLevel: player.heroLevel });
+                updatePlayerStats(session, { monsterKilled: true, heroLevel: player.heroLevel });
+            }
+            
+            message += '\n' +
+                world.GetLocationText(x, y, player) +
                 world.printWorldMap(x, y);
+        } else {
+            message += world.getNPCsText(x, y);
+            message += player.getPlayerDescription() + '\n';
         }
 
         const buttons = generateInlineButtons(
@@ -809,7 +816,7 @@ bot.on('callback_query', (query) => {
         message += player.getPlayerDescription() + '\n';
         message +=
             '\n' +
-            world.GetLocationText(x, y) +
+            world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
             world.printWorldMap(x, y);
 
@@ -914,10 +921,9 @@ bot.on('callback_query', (query) => {
         }
 
         if (!playerDied) {
-            message += player.getPlayerDescription() + '\n';
             message +=
                 '\n' +
-                world.GetLocationText(x, y) +
+                world.GetLocationText(x, y, player) +
                 player.getLocationCoords() +
                 world.printWorldMap(x, y);
         }
@@ -979,7 +985,7 @@ bot.on('callback_query', (query) => {
                 message += `Вы прибыли в новый мир: *${world.worldName}*\n\n`;
 
                 const locationMessage =
-                    world.GetLocationText(nx, ny) +
+                    world.GetLocationText(nx, ny, player) +
                     player.getLocationCoords() +
                     world.printWorldMap(nx, ny);
                 message += locationMessage;
@@ -1007,7 +1013,7 @@ bot.on('callback_query', (query) => {
                 message += '\n';
 
                 const locationMessage =
-                    world.GetLocationText(newX, newY) +
+                    world.GetLocationText(newX, newY, player) +
                     player.getLocationCoords() +
                     world.printWorldMap(newX, newY);
                 message += locationMessage;
