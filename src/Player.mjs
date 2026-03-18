@@ -17,12 +17,17 @@ export class Player {
         this.maxAttackPower = 10;
         this.health = this.maxHealth;
         this.armor = 0;
-        this.experience = 0; // total XP
+        this.experience = 0;
         this.heroLevel = 1;
+        this.coins = 0;
         this.visitedCells = new Set();
     }
 
     useItem(inItem) {
+        if (inItem.isCoin) {
+            this.coins += inItem.coins;
+            return 'Вы подобрали ' + inItem.coins + ' монет\n';
+        }
         if (inItem.isWeapon) {
             this.minAttackPower += inItem.minAttackPower;
             this.maxAttackPower += inItem.maxAttackPower;
@@ -112,7 +117,8 @@ export class Player {
             const xpNext = this.getXPToNextLevel();
             const xpString =
                 ' ✨ ' + this.experience + ' / ' + xpNext + ' (ур. ' + this.heroLevel + ')';
-            return '⭐ ' + this.name + xpString + healthString + attackString + '\n';
+            const coinsString = ' 🪙 ' + this.coins;
+            return '⭐ ' + this.name + xpString + healthString + attackString + coinsString + '\n';
         } else {
             return '☠️ ' + this.name + '\n';
         }

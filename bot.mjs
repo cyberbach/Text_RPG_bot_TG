@@ -5,7 +5,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { WorldGenerator } from './src/World.mjs';
 import { Player } from './src/Player.mjs';
-import { AllAgressiveNPCAttackPlayer, PlayerAttackNPC } from './src/Game.mjs';
+import { allAgressiveNPCAttackPlayer, playerAttackNPC } from './src/Game.mjs';
 import { DIRECTIONS } from './src/MovementDirections.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
 import dotenv from 'dotenv';
@@ -43,6 +43,7 @@ const globalStats = {
     uniquePlayers: new Set(),
     worldsVisited: new Set(),
     totalGamesStarted: 0,
+    totalCoins: 0,
 };
 
 function updateGlobalStats(options) {
@@ -52,6 +53,7 @@ function updateGlobalStats(options) {
     if (options.itemFound) globalStats.itemsFound++;
     if (options.gameCompleted) globalStats.gamesCompleted++;
     if (options.gamesStarted) globalStats.totalGamesStarted += options.gamesStarted;
+    if (options.coinsGained) globalStats.totalCoins += options.coinsGained;
     if (options.heroLevel && options.heroLevel > globalStats.maxHeroLevel) {
         globalStats.maxHeroLevel = options.heroLevel;
     }
@@ -73,6 +75,7 @@ function getGlobalStatsMessage(playerStats) {
         `🛡️ Всего урона получено: ${globalStats.totalDamageTaken}\n` +
         `💀 Всего монстров убито: ${globalStats.monstersKilled}\n` +
         `💎 Всего предметов найдено: ${globalStats.itemsFound}\n` +
+        `🪙 Всего монет: ${globalStats.totalCoins}\n` +
         `⭐️ Максимальный уровень: ${globalStats.maxHeroLevel}\n\n` +
         `📈 *СТАТИСТИКА ИГРОКА*\n\n` +
         `✅ Игр пройдено: ${playerStats.gamesCompleted}\n` +
@@ -80,6 +83,7 @@ function getGlobalStatsMessage(playerStats) {
         `🛡️ Получено урона: ${playerStats.totalDamageTaken}\n` +
         `💀 Убито монстров: ${playerStats.monstersKilled}\n` +
         `💎 Найдено предметов: ${playerStats.itemsFound}\n` +
+        `🪙 Монет: ${playerStats.totalCoins}\n` +
         `⭐️ Максимальный уровень: ${playerStats.maxHeroLevel}`;
 }
 
@@ -90,6 +94,7 @@ function updatePlayerStats(session, options) {
     if (options.monsterKilled) ps.monstersKilled++;
     if (options.itemFound) ps.itemsFound++;
     if (options.gameCompleted) ps.gamesCompleted++;
+    if (options.coinsGained) ps.totalCoins += options.coinsGained;
     if (options.heroLevel && options.heroLevel > ps.maxHeroLevel) {
         ps.maxHeroLevel = options.heroLevel;
     }
@@ -113,6 +118,7 @@ function createNewSession(chatId) {
             monstersKilled: 0,
             itemsFound: 0,
             maxHeroLevel: 1,
+            totalCoins: 0,
         },
     };
     sessions.set(chatId, session);
@@ -359,6 +365,7 @@ bot.on('callback_query', (query) => {
             monstersKilled: 0,
             itemsFound: 0,
             maxHeroLevel: 1,
+            totalCoins: 0,
         };
 
         const width = session.mode === 'pc' ? WORLD_PC_WIDTH : WORLD_MOBILE_WIDTH;
@@ -485,7 +492,7 @@ bot.on('callback_query', (query) => {
             }
 
             if (agressiveNPCsOnOldLocation.length > 0) {
-                const npcAttackResult = AllAgressiveNPCAttackPlayer(world, player, oldX, oldY);
+                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, oldX, oldY);
                 message += npcAttackResult.text;
                 updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
                 updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
@@ -501,7 +508,7 @@ bot.on('callback_query', (query) => {
 
             let isPlayerDied = false;
             if (agressiveNPCsOnOldLocation.length > 0) {
-                const npcAttackResult = AllAgressiveNPCAttackPlayer(world, player, oldX, oldY);
+                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, oldX, oldY);
                 isPlayerDied = npcAttackResult.stats.playerDied;
             }
 
@@ -575,7 +582,7 @@ bot.on('callback_query', (query) => {
         const agressiveNPCs = npcsAtLocation.filter(npc => npc.agressive);
         let isPlayerDied = false;
         if (agressiveNPCs.length > 0) {
-            const npcAttackResult = AllAgressiveNPCAttackPlayer(world, player);
+            const npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
             message += '\n' + npcAttackResult.text;
             updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
             updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
@@ -622,12 +629,12 @@ bot.on('callback_query', (query) => {
 
         let playerAttackResult, npcAttackResult;
         if (Math.random() > 0.5) {
-            playerAttackResult = PlayerAttackNPC(world, player);
-            npcAttackResult = AllAgressiveNPCAttackPlayer(world, player);
+            playerAttackResult = playerAttackNPC(world, player);
+            npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
             message += playerAttackResult.text + npcAttackResult.text;
         } else {
-            npcAttackResult = AllAgressiveNPCAttackPlayer(world, player);
-            playerAttackResult = PlayerAttackNPC(world, player);
+            npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
+            playerAttackResult = playerAttackNPC(world, player);
             message += npcAttackResult.text + playerAttackResult.text;
         }
 
@@ -635,6 +642,7 @@ bot.on('callback_query', (query) => {
             damageDealt: playerAttackResult.stats.damageDealt,
             monsterKilled: playerAttackResult.stats.monstersKilled > 0,
             damageTaken: npcAttackResult.stats.damageTaken,
+            coinsGained: playerAttackResult.stats.coinsGained,
         });
         updateGlobalStats({ heroLevel: player.heroLevel });
         updatePlayerStats(session, {
@@ -642,6 +650,7 @@ bot.on('callback_query', (query) => {
             monsterKilled: playerAttackResult.stats.monstersKilled > 0,
             damageTaken: npcAttackResult.stats.damageTaken,
             heroLevel: player.heroLevel,
+            coinsGained: playerAttackResult.stats.coinsGained,
         });
 
         if (npcAttackResult.stats.playerDied) {

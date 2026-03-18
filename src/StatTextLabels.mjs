@@ -1,4 +1,4 @@
-export const TEXT_LABELS = Object.freeze({
+export const STAT_TEXT_LABELS = Object.freeze({
     health: 'Здоровья',
     maxHealth: 'макс. Здоровья',
     damage: 'Урона',

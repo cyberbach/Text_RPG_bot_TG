@@ -1,6 +1,6 @@
 import { AdjectiveWords } from './AdjectiveWords.mjs';
 import { DEBUG_ITEMS_CREATION } from './GameDebug.mjs';
-import { TEXT_LABELS } from './TextLabels.mjs';
+import { STAT_STAT_TEXT_LABELS } from './StatTextLabels.mjs';
 
 export class Item {
     constructor() {
@@ -10,6 +10,8 @@ export class Item {
         this.maxAttackPower = 0;
         this.isHealing = false;
         this.isWeapon = false;
+        this.isCoin = false;
+        this.coins = 0;
         this.name = '';
     }
 
@@ -66,6 +68,15 @@ export class Item {
     setupAtLocation(a, b) {
         this.x = a;
         this.y = b;
+        
+        const coinChance = Math.random();
+        if (coinChance < 0.3) {
+            this.isCoin = true;
+            this.coins = 1 + Math.floor(Math.random() * 10);
+            this.name = 'Монета' + (this.coins > 1 ? 'ы' : '');
+            return;
+        }
+
         if (Math.random() > 0.5) {
             this.isHealing = false;
             this.isWeapon = true;
@@ -103,19 +114,21 @@ export class Item {
     getItemDescription() {
         let descriptionString = '';
         descriptionString += '- ' + this.name + ' ';
-        if (this.isHealing) {
+        if (this.isCoin) {
+            descriptionString += '🪙 ' + this.coins + '\n';
+        } else if (this.isHealing) {
             const parts = [];
             if (this.health)
-                parts.push('+' + this.health + ' ' + TEXT_LABELS.health);
+                parts.push('+' + this.health + ' ' + STAT_TEXT_LABELS.health);
             if (this.maxHealth)
-                parts.push('+' + this.maxHealth + ' ' + TEXT_LABELS.maxHealth);
+                parts.push('+' + this.maxHealth + ' ' + STAT_TEXT_LABELS.maxHealth);
             descriptionString += '❤️ ' + (parts.length ? parts.join(', ') : '+0');
         } else {
             const parts = [];
             if (this.minAttackPower)
-                parts.push('+' + this.minAttackPower + ' ' + TEXT_LABELS.minDamage);
+                parts.push('+' + this.minAttackPower + ' ' + STAT_TEXT_LABELS.minDamage);
             if (this.maxAttackPower)
-                parts.push('+' + this.maxAttackPower + ' ' + TEXT_LABELS.maxDamage);
+                parts.push('+' + this.maxAttackPower + ' ' + STAT_TEXT_LABELS.maxDamage);
             descriptionString += '⚔️ ' + (parts.length ? parts.join(', ') : '+0');
         }
         descriptionString += '\n';

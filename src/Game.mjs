@@ -1,6 +1,6 @@
-export function PlayerAttackNPC(inWorld, inPlayer) {
+export function playerAttackNPC(inWorld, inPlayer) {
     let attackResult = '';
-    let stats = { damageDealt: 0, monstersKilled: 0 };
+    let stats = { damageDealt: 0, monstersKilled: 0, coinsGained: 0 };
     const x = inPlayer.getX();
     const y = inPlayer.getY();
 
@@ -25,6 +25,12 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
                 inWorld.npcs.splice(indexToRemove, 1);
                 stats.monstersKilled++;
                 attackResult += oneNpc.name + ' убит 💀\n';
+                
+                const coinAmount = 1 + Math.floor(Math.random() * 5);
+                inPlayer.coins += coinAmount;
+                stats.coinsGained += coinAmount;
+                attackResult += 'Вы получили ' + coinAmount + ' монет 🪙\n';
+                
                 inWorld.generateOneItem(x, y);
             }
         } else {
@@ -36,7 +42,7 @@ export function PlayerAttackNPC(inWorld, inPlayer) {
     return { text: attackResult, stats };
 }
 
-export function AllAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY) {
+export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY) {
     let attackResult = '';
     let stats = { damageTaken: 0, playerDied: false };
     const x = attackX !== undefined ? attackX : inPlayer.getX();

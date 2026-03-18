@@ -91,37 +91,37 @@ export class WorldGenerator {
                 const firstLetter = locationType.charAt(0);
                 let displayLetter = ' ';
                 switch (firstLetter) {
-                    case 'F':
+                    case 'F': // FOREST
                         displayLetter = '△';
                         break;
-                    case 'D':
+                    case 'D': // DESERT
                         displayLetter = ' ';
                         break;
-                    case 'U':
+                    case 'U': // UNDERCAVE
                         displayLetter = '.';
                         break;
-                    case 'R':
+                    case 'R': // RIVER
                         displayLetter = '◌'; //◯
                         break;
-                    case 'G':
+                    case 'G': // GLADE
                         displayLetter = '.';
                         break;
-                    case 'M':
+                    case 'M': // MEADOW
                         displayLetter = '.';
                         break;
-                    case 'T':
+                    case 'T': // THICKETS
                         displayLetter = '+';
                         break;
-                    case 'Z':
+                    case 'Z': // ZROAD
                         displayLetter = '.';
                         break;
-                    case 'C':
+                    case 'C': // CITY
                         displayLetter = '▯';
                         break;
                 }
 
                 if (a === j && b === i) {
-                    displayLetter = '●'; //● ◆
+                    displayLetter = '●'; // HERO ● ◆
                 }
 
                 firstLetterRow.push(displayLetter);
