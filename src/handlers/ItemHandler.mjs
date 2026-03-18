@@ -1,0 +1,91 @@
+import { allAgressiveNPCAttackPlayer } from '../Game.mjs';
+
+/**
+ * Обработка подбора предмета (use)
+ * - Если предметов нет - показывает сообщение и текущую локацию
+ * - Подбирает случайный предмет с локации
+ * - Применяет бонусы предмета к игроку (HP, атака)
+ * - Начисляет 1 XP за подбор
+ * - Атака от агрессивных NPC после подбора (если игрок погибает - конец игры)
+ * - Показывает обновлённую статистику игрока и локацию
+ */
+export function handleItemUse(params) {
+    const { session, player, world, query, bot, STAT_EMOJI, updateGlobalStats, updatePlayerStats, generateInlineButtons, generateDeathButtons } = params;
+
+    let message = '';
+    const x = player.getX();
+    const y = player.getY();
+
+    const itemsToUse = world.getItemsAtLocation(x, y);
+    if (itemsToUse.length === 0) {
+        message =
+            'На локации нет предметов.\n\n' +
+            world.GetLocationText(x, y, player) +
+            player.getLocationCoords() +
+            world.printWorldMap(x, y);
+
+        const buttons = generateInlineButtons(
+            world.getAvailableDirections(x, y),
+            world.getAvailableActions(x, y)
+        );
+
+        return { message, buttons, removeKeyboard: true };
+    }
+
+    const oneItemToUse = itemsToUse[Math.floor(Math.random() * itemsToUse.length)];
+    const useResult = player.useItem(oneItemToUse);
+    message = useResult.text;
+    
+    const expResult = player.addExperienceForAction(1);
+    message += `✨ Опыт: +${expResult.gained}\n`;
+    if (expResult.leveledUp && expResult.statsGained) {
+        message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+        message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+        message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
+    }
+    message += '\n' + player.getPlayerDescription();
+    
+    const indexToRemove = world.items.findIndex(item => item === oneItemToUse);
+    world.items.splice(indexToRemove, 1);
+    updateGlobalStats({ itemFound: true, heroLevel: player.heroLevel });
+    updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel, coinsGained: useResult.coinsGained });
+
+    const npcsAtLocation = world.getNPCsAtLocation(x, y);
+    const agressiveNPCs = npcsAtLocation.filter(npc => npc.isAggressive());
+    let isPlayerDied = false;
+    
+    if (agressiveNPCs.length > 0) {
+        const npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
+        message += '\n' + npcAttackResult.text;
+        updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
+        updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
+        
+        if (npcAttackResult.stats.playerDied) {
+            isPlayerDied = true;
+            updateGlobalStats({ gameCompleted: true, death: true });
+            updatePlayerStats(session, { gameCompleted: true, death: true });
+            message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+        }
+    }
+
+    message += '\n' +
+        world.GetLocationText(x, y, player) +
+        player.getLocationCoords() +
+        world.printWorldMap(x, y);
+
+    const buttons = isPlayerDied 
+        ? generateDeathButtons()
+        : generateInlineButtons(
+            world.getAvailableDirections(x, y),
+            world.getAvailableActions(x, y)
+        );
+
+    if (query.message) {
+        bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+        });
+    }
+
+    return { message, buttons, removeKeyboard: true };
+}

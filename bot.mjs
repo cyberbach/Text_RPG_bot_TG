@@ -6,13 +6,13 @@ import TelegramBot from 'node-telegram-bot-api';
 import { WorldGenerator } from './src/World.mjs';
 import { Player } from './src/Player.mjs';
 import { Item } from './src/Item.mjs';
-import { allAgressiveNPCAttackPlayer, playerAttackNPC } from './src/Game.mjs';
-import { DIRECTIONS } from './src/MovementDirections.mjs';
-import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
-import { initEvent, getCurrentEventName, tickEventDuration, getHitChanceModifier } from './src/EventSystem.mjs';
+import { initEvent } from './src/EventSystem.mjs';
 import { PORTAL_SETTINGS, DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_LOG_SPAWN } from './src/GameSetup.mjs';
 import { NPC_TYPE } from './src/NPC.mjs';
 import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
+import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
+import { generateInlineButtons, generateDeathButtons } from './src/TelegramButtons.mjs';
+import { handleMovement, handleCombat, handleItemUse, handleBuy, handleHelp, handlePortal } from './src/handlers/index.mjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -33,8 +33,8 @@ console.log('========================================');
 
 // ================= GAME CODE ===================
 
-const WORLD_MOBILE_WIDTH = 13; // 13 максимум на телефоне
-const WORLD_MOBILE_HEIGHT = 10; // 10
+const WORLD_MOBILE_WIDTH = 13;
+const WORLD_MOBILE_HEIGHT = 10;
 const WORLD_PC_WIDTH = 22;
 const WORLD_PC_HEIGHT = 16;
 
@@ -55,7 +55,6 @@ const globalStats = {
     deaths: 0,
 };
 
-// Обновление глобальной статистики (для всех игроков)
 function updateGlobalStats(options) {
     if (options.damageDealt) globalStats.totalDamageDealt += options.damageDealt;
     if (options.damageTaken) globalStats.totalDamageTaken += options.damageTaken;
@@ -79,7 +78,6 @@ function updateGlobalStats(options) {
     if (options.death) globalStats.deaths++;
 }
 
-// Формирование сообщения со статистикой
 function getGlobalStatsMessage(playerStats) {
     return `📊 *ГЛОБАЛЬНАЯ СТАТИСТИКА*\n\n` +
         `${STAT_EMOJI.GAME} Всего игр начато: ${globalStats.totalGamesStarted}\n` +
@@ -108,7 +106,6 @@ function getGlobalStatsMessage(playerStats) {
         `${STAT_EMOJI.LEVEL} Максимальный уровень: ${playerStats.maxHeroLevel}`;
 }
 
-// Обновление статистики текущего игрока
 function updatePlayerStats(session, options) {
     const ps = session.playerStats;
     if (options.damageDealt) ps.totalDamageDealt += options.damageDealt;
@@ -120,17 +117,14 @@ function updatePlayerStats(session, options) {
     if (options.heroLevel && options.heroLevel > ps.maxHeroLevel) {
         ps.maxHeroLevel = options.heroLevel;
     }
-    if (options.questCompleted) ps.questsCompleted++;
+    if (options.questCompleted) ps.questCompleted++;
     if (options.itemPurchased) ps.itemsPurchased++;
     if (options.portalUsed) ps.portalsUsed++;
     if (options.death) ps.deaths++;
 }
 
-// One game session per chat (in-memory only).
-// Different chats can play simultaneously without interfering.
 const sessions = new Map();
 
-// Создание новой игровой сессии для чата
 function createNewSession(chatId) {
     const session = {
         chatId,
@@ -156,20 +150,17 @@ function createNewSession(chatId) {
     return session;
 }
 
-// Получение существующей сессии или создание новой
 function getSession(chatId) {
-    return sessions.get(chatId) ?? createNewSession(chatId);
+    if (!sessions.has(chatId)) {
+        return createNewSession(chatId);
+    }
+    return sessions.get(chatId);
 }
 
-// Настройка новой игры (генерация мира, игрока)
-function setupNewGame(session, { width, height, playerName, mode }) {
-    session.mode = mode;
-    session.combatState = false;
-
-    session.world.setup(width, height);
+function setupNewGame(session, options) {
+    session.world.setup(options.width, options.height);
     session.world.generate();
-
-    session.player.setup(width, height, playerName);
+    session.player.setup(options.width, options.height, options.playerName);
     session.player.clearAttributes();
     session.player.setRandomLocation();
 
@@ -182,7 +173,6 @@ function setupNewGame(session, { width, height, playerName, mode }) {
     session.world.generateQuestGiver(x, y);
     session.world.generateItems(x, y);
     session.world.generatePortals(x, y);
-    
     session.player.markCellVisited(x, y);
 
     if (DEBUG_MERCHANT_QUEST_MASS_SPAWN || DEBUG_LOG_SPAWN) {
@@ -207,101 +197,16 @@ function setupNewGame(session, { width, height, playerName, mode }) {
     return { x, y };
 }
 
+// ================= BOT ===================
+
 const bot = new TelegramBot(process.env.BOT_TOKEN, {
     polling: {
-        interval: 300, // Опционально: интервал опроса в мс
+        interval: 300,
         autoStart: false,
     },
 });
 
-bot.on('polling_error', (error) => {
-    const msg = error?.message || String(error);
-    if (msg.includes('409') || msg.toLowerCase().includes('conflict')) {
-        console.error(
-            '[WARN] Telegram API 409 Conflict: another getUpdates request is active.'
-        );
-        console.error(
-            'This is not a code error. Stop other bot instances (or remove webhook) and restart.'
-        );
-        return;
-    }
-
-    console.error('Polling error:', error);
-});
-
-bot.on('webhook_error', (error) => {
-    console.error('Webhook error:', error);
-});
-
-const mainMenu = [
-    { command: 'start', description: 'Начать игру на мобильном' },
-    { command: 'pc', description: 'Начать игру на компьютере' },
-    { command: 'info', description: 'Статистика игры' },
-    { command: 'help', description: 'Помощь' },
-];
-await bot.setMyCommands(mainMenu).catch(e => console.error('[WARN] setMyCommands failed:', e));
-
-try {
-    const me = await bot.getMe();
-    console.log(`Bot identity: @${me.username} (id: ${me.id})`);
-} catch (e) {
-    console.error('[WARN] bot.getMe() failed:', e);
-}
-
-try {
-    await bot.startPolling();
-    console.log('Polling started. Bot is running and waiting for updates...');
-} catch (e) {
-    console.error('[FATAL] Failed to start polling:', e);
-    process.exit(1);
-}
-
-// Генерация Inline-кнопок для навигации и действий
-function generateInlineButtons(availableDirections, availableActions) {
-    // Фильтруем кнопки по доступным направлениям
-    const generatedMoveButtons = [];
-
-    for (const dir of availableDirections) {
-        if (TG_MOVE_DIRECTIONS[dir]) {
-            generatedMoveButtons.push({
-                text: TG_MOVE_DIRECTIONS[dir].text,
-                callback_data: TG_MOVE_DIRECTIONS[dir].callback,
-            });
-        }
-    }
-
-    const generatedActionButtons = [];
-    for (const oneAction of availableActions) {
-        if (TG_ACTIONS[oneAction]) {
-            generatedActionButtons.push({
-                text: TG_ACTIONS[oneAction].text,
-                callback_data: TG_ACTIONS[oneAction].callback,
-            });
-        }
-    }
-
-    // console.log('action buttons:', generatedActionButtons);
-
-    return {
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [generatedMoveButtons, generatedActionButtons],
-        },
-    };
-}
-
-// Генерация кнопки "Новая игра" после смерти игрока
-function generateDeathButtons() {
-    return {
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [[{ text: 'Новая игра', callback_data: 'new_game' }]],
-        },
-    };
-}
-
 // ================= START on Mobile ===================
-// start
 bot.onText(/\/start/, (msg) => {
     const session = createNewSession(msg.chat.id);
     const { x, y } = setupNewGame(session, {
@@ -331,7 +236,6 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ================= START on PC ===================
-// start
 bot.onText(/\/pc/, (msg) => {
     const session = createNewSession(msg.chat.id);
     const { x, y } = setupNewGame(session, {
@@ -361,7 +265,6 @@ bot.onText(/\/pc/, (msg) => {
 });
 
 // ================= HELP ===================
-// help
 bot.onText(/\/help/, (msg) => {
     const session = getSession(msg.chat.id);
     const playerName = msg.from.first_name;
@@ -403,19 +306,17 @@ bot.onText(/\/info/, (msg) => {
     bot.sendMessage(msg.chat.id, message, { parse_mode: 'Markdown' });
 });
 
-// Защита от спама: время последнего callback для каждого чата
+// Защита от спама
 const lastCallbackTime = new Map();
-const CALLBACK_COOLDOWN = 500; // мс между обработкой callback от одного чата
+const CALLBACK_COOLDOWN = 500;
 
 // ================= CALLBACK QUERY ===================
-// Обработка Inline-кнопок
 bot.on('callback_query', (query) => {
     if (!query.data) return;
     
     const action = query.data;
     const currentChatID = query.message.chat.id;
     
-    // Защита от спама
     const lastTime = lastCallbackTime.get(currentChatID) || 0;
     if (Date.now() - lastTime < CALLBACK_COOLDOWN) {
         bot.answerCallbackQuery(query.id, { text: 'Подождите...' });
@@ -427,7 +328,6 @@ bot.on('callback_query', (query) => {
     const world = session.world;
     const player = session.player;
 
-    // Проверка что игра инициализирована
     if (!world.maze || world.maze.length === 0 || !player.maxWidth) {
         bot.answerCallbackQuery(query.id, { text: 'Начните новую игру!' });
         return;
@@ -446,25 +346,18 @@ bot.on('callback_query', (query) => {
             itemsFound: 0,
             maxHeroLevel: 1,
             totalCoins: 0,
+            questsCompleted: 0,
+            itemsPurchased: 0,
+            portalsUsed: 0,
+            deaths: 0,
         };
 
-        const width = session.mode === 'pc' ? WORLD_PC_WIDTH : WORLD_MOBILE_WIDTH;
-        const height = session.mode === 'pc' ? WORLD_PC_HEIGHT : WORLD_MOBILE_HEIGHT;
-
-        session.world.setup(width, height);
-        session.world.generate();
-        session.player.setup(width, height, player.name);
-        session.player.clearAttributes();
-        session.player.setRandomLocation();
-
-        const px = session.player.getX();
-        const py = session.player.getY();
-        session.world.generateNPC(px, py);
-        session.world.generateMerchant(px, py);
-        session.world.generateQuestGiver(px, py);
-        session.world.generateItems(px, py);
-        session.world.generatePortals(px, py);
-        session.player.markCellVisited(px, py);
+        const { x, y } = setupNewGame(session, {
+            width: session.mode === 'pc' ? WORLD_PC_WIDTH : WORLD_MOBILE_WIDTH,
+            height: session.mode === 'pc' ? WORLD_PC_HEIGHT : WORLD_MOBILE_HEIGHT,
+            playerName: player.name,
+            mode: session.mode,
+        });
 
         updateGlobalStats({ 
             playerId: currentChatID, 
@@ -473,15 +366,15 @@ bot.on('callback_query', (query) => {
         });
 
         const buttons = generateInlineButtons(
-            session.world.getAvailableDirections(px, py),
-            session.world.getAvailableActions(px, py)
+            session.world.getAvailableDirections(x, y),
+            session.world.getAvailableActions(x, y)
         );
 
         const message =
             `${STAT_EMOJI.ATTACK} Новая игра началась! ${STAT_EMOJI.ATTACK}\n\n` +
-            session.world.GetLocationText(px, py, session.player) +
+            session.world.GetLocationText(x, y, session.player) +
             session.player.getLocationCoords() +
-            session.world.printWorldMap(px, py);
+            session.world.printWorldMap(x, y);
 
         bot.editMessageText(message, {
             chat_id: currentChatID,
@@ -494,580 +387,81 @@ bot.on('callback_query', (query) => {
         return;
     }
 
-    let message = '';
+    // Параметры для handlers
+    const handlerParams = {
+        session,
+        player,
+        world,
+        action,
+        query,
+        bot,
+        STAT_EMOJI,
+        updateGlobalStats,
+        updatePlayerStats,
+        generateInlineButtons,
+        generateDeathButtons,
+        WORLD_MOBILE_WIDTH,
+        WORLD_MOBILE_HEIGHT,
+        WORLD_PC_WIDTH,
+        WORLD_PC_HEIGHT,
+    };
 
-    let x = player.getX();
-    let y = player.getY();
+    let result = { message: '', buttons: null, removeKeyboard: false, editOnly: false };
 
     // ================== MOVE ======================
-    if (
-        action === 'move_up' ||
-        action === 'move_down' ||
-        action === 'move_left' ||
-        action === 'move_right'
-    ) {
-        let moved = false;
-        const oldX = player.getX();
-        const oldY = player.getY();
-        
-        switch (action) {
-            case 'move_up':
-                moved = player.move(DIRECTIONS.UP);
-                break;
-            case 'move_down':
-                moved = player.move(DIRECTIONS.DOWN);
-                break;
-            case 'move_left':
-                moved = player.move(DIRECTIONS.LEFT);
-                break;
-            case 'move_right':
-                moved = player.move(DIRECTIONS.RIGHT);
-                break;
-        }
-
-        x = player.getX();
-        y = player.getY();
-
-        const directionNames = {
-            'move_up': 'Север',
-            'move_down': 'Юг',
-            'move_left': 'Запад',
-            'move_right': 'Восток'
-        };
-        const directionName = directionNames[action] || 'неизвестное направление';
-
-        if (!moved) {
-            message += 'Нельзя идти туда.\n\n';
-            const expResult = player.addExperienceForAction(1);
-            if (expResult.leveledUp && expResult.statsGained) {
-                message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n\n`;
-            }
-
-            message +=
-                world.GetLocationText(x, y, player) +
-                player.getLocationCoords() +
-                world.printWorldMap(x, y);
-
-            const buttons = generateInlineButtons(
-                world.getAvailableDirections(x, y),
-                world.getAvailableActions(x, y)
-            );
-
-            if (query.message) {
-                bot.editMessageText(message, {
-                    chat_id: currentChatID,
-                    message_id: query.message.message_id,
-                    reply_markup: JSON.stringify({ inline_keyboard: [] }),
-                    parse_mode: 'Markdown'
-                });
-            }
-        } else {
-            const npcsOnOldLocation = world.getNPCsAtLocation(oldX, oldY);
-            const agressiveNPCsOnOldLocation = npcsOnOldLocation.filter(npc => npc.isAggressive());
-            
-            let isPlayerDied = false;
-            
-            if (agressiveNPCsOnOldLocation.length > 0) {
-                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, oldX, oldY);
-                message += npcAttackResult.text;
-                updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
-                updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
-                
-                if (npcAttackResult.stats.playerDied) {
-                    isPlayerDied = true;
-                    updateGlobalStats({ gameCompleted: true, death: true });
-                    updatePlayerStats(session, { gameCompleted: true, death: true });
-                    message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-                }
-            }
-
-            if (!isPlayerDied) {
-                const portalAtNewLocation = world.getPortalAtLocation(x, y);
-                if (portalAtNewLocation) {
-                    portalAtNewLocation.visited = true;
-                }
-
-                if (!player.isCellVisited(x, y)) {
-                    world.recalculateNPCsForLevel(player.heroLevel);
-                    player.markCellVisited(x, y);
-                }
-
-                const weatherChanged = tickEventDuration();
-
-                const locationMessage =
-                    world.GetLocationText(x, y, player) +
-                    player.getLocationCoords() +
-                    world.printWorldMap(x, y);
-                
-                let moveMessage = `Вы перешли на ${directionName}`;
-                if (weatherChanged) {
-                    const hitChance = player.getHitChance(getHitChanceModifier());
-                    moveMessage += `. ${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
-                }
-                moveMessage += '\n\n';
-                
-                message += moveMessage + locationMessage;
-            }
-
-            const buttons = isPlayerDied 
-                ? generateDeathButtons()
-                : generateInlineButtons(
-                    world.getAvailableDirections(x, y),
-                    world.getAvailableActions(x, y)
-                );
-
-            if (query.message) {
-                bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                    chat_id: currentChatID,
-                    message_id: query.message.message_id,
-                });
-            }
-
-            bot.sendMessage(currentChatID, message, buttons);
-        }
+    if (action === 'move_up' || action === 'move_down' || action === 'move_left' || action === 'move_right') {
+        result = handleMovement(handlerParams);
     }
-
     // ============ USE ===============
-    if (action === 'use') {
-        message = '';
-
-        x = player.getX();
-        y = player.getY();
-
-        const itemsToUse = world.getItemsAtLocation(x, y);
-        if (itemsToUse.length === 0) {
-            message =
-                'На локации нет предметов.\n\n' +
-                world.GetLocationText(x, y, player) +
-                player.getLocationCoords() +
-                world.printWorldMap(x, y);
-
-            const buttons = generateInlineButtons(
-                world.getAvailableDirections(x, y),
-                world.getAvailableActions(x, y)
-            );
-
-            bot.sendMessage(currentChatID, message, buttons);
-            bot.answerCallbackQuery(query.id);
-            return;
-        }
-        const oneItemToUse =
-            itemsToUse[Math.floor(Math.random() * itemsToUse.length)];
-        const useResult = player.useItem(oneItemToUse);
-        message = useResult.text;
-        
-        const expResult = player.addExperienceForAction(1);
-        message += `✨ Опыт: +${expResult.gained}\n`;
-        if (expResult.leveledUp && expResult.statsGained) {
-            message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-            message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-            message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
-        }
-        message += '\n' + player.getPlayerDescription();
-        
-        const indexToRemove = world.items.findIndex(
-            (item) => item === oneItemToUse
-        );
-        world.items.splice(indexToRemove, 1);
-        updateGlobalStats({ itemFound: true, heroLevel: player.heroLevel });
-        updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel, coinsGained: useResult.coinsGained });
-
-        const npcsAtLocation = world.getNPCsAtLocation(x, y);
-        const agressiveNPCs = npcsAtLocation.filter(npc => npc.isAggressive());
-        let isPlayerDied = false;
-        
-        if (agressiveNPCs.length > 0) {
-            const npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
-            message += '\n' + npcAttackResult.text;
-            updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
-            updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
-            
-            if (npcAttackResult.stats.playerDied) {
-                isPlayerDied = true;
-                updateGlobalStats({ gameCompleted: true, death: true });
-                updatePlayerStats(session, { gameCompleted: true, death: true });
-                message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-            }
-        }
-
-        message += '\n' +
-            world.GetLocationText(x, y, player) +
-            player.getLocationCoords() +
-            world.printWorldMap(x, y);
-
-        const buttons = isPlayerDied 
-            ? generateDeathButtons()
-            : generateInlineButtons(
-                world.getAvailableDirections(x, y),
-                world.getAvailableActions(x, y)
-            );
-
-        if (query.message) {
-            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: currentChatID,
-                message_id: query.message.message_id,
-            });
-        }
-        
-        bot.sendMessage(currentChatID, message, buttons);
+    else if (action === 'use') {
+        session.combatState = false;
+        result = handleItemUse(handlerParams);
+    }
+    // ============ ATTACK ===============
+    else if (action === 'attack') {
+        session.combatState = true;
+        result = handleCombat(handlerParams);
+    }
+    // ============ BUY ===============
+    else if (action === 'buy') {
+        result = handleBuy(handlerParams);
+    }
+    // ============ HELP ===============
+    else if (action === 'help') {
+        result = handleHelp(handlerParams);
+    }
+    // ============ PORTAL ===============
+    else if (action === 'portal') {
+        result = handlePortal(handlerParams);
     }
 
-    // ============ ATTACK ===============
-    if (action === 'attack') {
-        session.combatState = true;
-        message = '';
-        x = player.getX();
-        y = player.getY();
-
-        let playerAttackResult, npcAttackResult;
-        
-        npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
-        
-        if (npcAttackResult.stats.playerDied) {
-            message += npcAttackResult.text;
-            
-            updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
-            updateGlobalStats({ gameCompleted: true, death: true });
-            updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
-            updatePlayerStats(session, { gameCompleted: true, death: true });
-            session.combatState = false;
-            message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-            
-            const buttons = generateDeathButtons();
-            
-            if (query.message) {
+    // Отправка результата
+    if (result.message) {
+        if (result.editOnly && query.message) {
+            bot.editMessageText(result.message, {
+                chat_id: currentChatID,
+                message_id: query.message.message_id,
+                parse_mode: 'Markdown',
+                reply_markup: JSON.stringify(result.buttons ? result.buttons.reply_markup : { inline_keyboard: [] })
+            });
+        } else {
+            if (result.removeKeyboard && query.message) {
                 bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
                     chat_id: currentChatID,
                     message_id: query.message.message_id,
                 });
             }
-            
-            bot.sendMessage(currentChatID, message, buttons);
-            bot.answerCallbackQuery(query.id);
-            return;
+            bot.sendMessage(currentChatID, result.message, result.buttons);
         }
-        
-        playerAttackResult = playerAttackNPC(world, player);
-        message += npcAttackResult.text + playerAttackResult.text;
-
-        updateGlobalStats({
-            damageDealt: playerAttackResult.stats.damageDealt,
-            damageTaken: npcAttackResult.stats.damageTaken,
-            coinsGained: playerAttackResult.stats.coinsGained,
-        });
-        updatePlayerStats(session, {
-            damageDealt: playerAttackResult.stats.damageDealt,
-            damageTaken: npcAttackResult.stats.damageTaken,
-            coinsGained: playerAttackResult.stats.coinsGained,
-        });
-
-        message += '\n';
-        let liveNPCs = world.getNPCsAtLocation(x, y);
-
-        if (liveNPCs.length == 0) {
-            session.combatState = false;
-            
-            if (playerAttackResult.stats.monstersKilled > 0) {
-                const xpGained = playerAttackResult.stats.monstersKilled * 5;
-                const expResult = player.addExperienceForAction(xpGained);
-                message += `✨ Опыт за убитых врагов: +${expResult.gained}\n`;
-                if (expResult.leveledUp && expResult.statsGained) {
-                    message += `\n${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                    message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                    message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
-                }
-                updateGlobalStats({ monsterKilled: true, heroLevel: player.heroLevel });
-                updatePlayerStats(session, { monsterKilled: true, heroLevel: player.heroLevel });
-            }
-            
-            message += '\n' +
-                world.GetLocationText(x, y, player) +
-                world.printWorldMap(x, y);
-        } else {
-            message += world.getNPCsText(x, y);
-            message += player.getPlayerDescription() + '\n';
-        }
-
-        const buttons = generateInlineButtons(
-            world.getAvailableDirections(x, y),
-            world.getAvailableActions(x, y)
-        );
-
-        if (query.message) {
-            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: currentChatID,
-                message_id: query.message.message_id,
-            });
-        }
-
-        bot.sendMessage(currentChatID, message, buttons);
-    }
-
-    // ============ BUY ===============
-    if (action === 'buy') {
-        message = '';
-        x = player.getX();
-        y = player.getY();
-
-        let merchantFound = null;
-        world.npcs.forEach((npc) => {
-            if (npc.isMerchant() && npc.x === x && npc.y === y) {
-                merchantFound = npc;
-            }
-        });
-
-        if (!merchantFound) {
-            message += 'Здесь нет торговца.\n';
-        } else {
-            const price = merchantFound.merchantPrice;
-            
-            if (player.coins < price) {
-                message += `${merchantFound.name} просит ${price} монет за товар, но у вас недостаточно денег.\n`;
-                merchantFound.merchantUsed = true;
-            } else {
-                player.coins -= price;
-                updatePlayerStats(session, { coinsSpent: price, itemPurchased: true });
-                updateGlobalStats({ itemPurchased: true });
-                
-                const newItem = new Item();
-                newItem.setupAtLocation(x, y);
-                world.items.push(newItem);
-                
-                message += `${merchantFound.name} продал вам ${newItem.name} за ${price} монет.\n`;
-                merchantFound.merchantUsed = true;
-            }
-        }
-
-        message += player.getPlayerDescription() + '\n';
-        message +=
-            '\n' +
-            world.GetLocationText(x, y, player) +
-            player.getLocationCoords() +
-            world.printWorldMap(x, y);
-
-        const buttons = generateInlineButtons(
-            world.getAvailableDirections(x, y),
-            world.getAvailableActions(x, y)
-        );
-
-        if (query.message) {
-            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: currentChatID,
-                message_id: query.message.message_id,
-            });
-        }
-
-        bot.sendMessage(currentChatID, message, buttons);
-    }
-
-    // ============ HELP ===============
-    if (action === 'help') {
-        message = '';
-        x = player.getX();
-        y = player.getY();
-        let playerDied = false;
-
-        let questGiverFound = null;
-        world.npcs.forEach((npc) => {
-            if (npc.isQuestGiver() && npc.x === x && npc.y === y) {
-                questGiverFound = npc;
-            }
-        });
-
-        if (!questGiverFound) {
-            message += 'Здесь нет того, кому можно помочь.\n';
-        } else {
-            if (questGiverFound.didHelpSucceed()) {
-                const reward = questGiverFound.getQuestReward();
-                let rewardCount = 0;
-                
-                if (reward.coinsReward > 0) {
-                    const coinItem = new Item();
-                    coinItem.setupAtLocation(x, y);
-                    coinItem.isCoin = true;
-                    coinItem.coins = reward.coinsReward;
-                    coinItem.name = reward.coinsReward === 1 ? 'Монета' : (reward.coinsReward >= 5 && reward.coinsReward <= 20 ? 'Монеты' : 'Монет');
-                    world.items.push(coinItem);
-                    rewardCount++;
-                }
-                
-                if (reward.itemReward) {
-                    const newItem = new Item();
-                    newItem.setupAtLocation(x, y);
-                    newItem.isCoin = false;
-                    newItem.isWeapon = false;
-                    newItem.isHealing = false;
-                    newItem.health = 0;
-                    newItem.maxHealth = 0;
-                    newItem.minAttackPower = 0;
-                    newItem.maxAttackPower = 0;
-                    
-                    if (reward.itemReward.isWeapon) {
-                        newItem.isWeapon = true;
-                        newItem.minAttackPower = reward.itemReward.minAttackPower;
-                        newItem.maxAttackPower = reward.itemReward.maxAttackPower;
-                        newItem.name = 'Оружие';
-                    } else {
-                        newItem.isHealing = true;
-                        newItem.health = reward.itemReward.health;
-                        newItem.maxHealth = reward.itemReward.maxHealth;
-                        newItem.name = 'Зелье';
-                    }
-                    
-                    world.items.push(newItem);
-                    rewardCount++;
-                }
-                
-                if (rewardCount > 0) {
-                    message += `Вы помогли ${questGiverFound.name}! ${STAT_EMOJI.COINS} Вам выпала награда!\n`;
-                } else {
-                    message += `Вы помогли ${questGiverFound.name}, но не получили награды.\n`;
-                }
-                
-                questGiverFound.questCompleted = true;
-                updatePlayerStats(session, { questCompleted: true });
-                updateGlobalStats({ questCompleted: true });
-            } else {
-                message += `Вы попытались помочь ${questGiverFound.name}, но ему что-то не понравилось!\n`;
-                message += `${questGiverFound.name} разозлился и напал на вас!\n`;
-                questGiverFound.agressive = true;
-                questGiverFound.questCompleted = true;
-                
-                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, x, y);
-                message += npcAttackResult.text;
-                
-                if (npcAttackResult.stats.playerDied) {
-                    playerDied = true;
-                    updateGlobalStats({ gameCompleted: true, death: true });
-                    updatePlayerStats(session, { gameCompleted: true, death: true });
-                    message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-                }
-            }
-        }
-
-        if (!playerDied) {
-            message +=
-                '\n' +
-                world.GetLocationText(x, y, player) +
-                player.getLocationCoords() +
-                world.printWorldMap(x, y);
-        }
-
-        const buttons = playerDied
-            ? generateDeathButtons()
-            : generateInlineButtons(
-                world.getAvailableDirections(x, y),
-                world.getAvailableActions(x, y)
-            );
-
-        if (query.message) {
-            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: currentChatID,
-                message_id: query.message.message_id,
-            });
-        }
-
-        bot.sendMessage(currentChatID, message, buttons);
-    }
-
-    // ============ PORTAL ===============
-    if (action === 'portal') {
-        message = '';
-        x = player.getX();
-        y = player.getY();
-
-        const portal = world.getPortalAtLocation(x, y);
-
-        if (!portal) {
-            message += 'Здесь нет портала.\n';
-        } else {
-            portal.visited = true;
-            updatePlayerStats(session, { portalUsed: true });
-            updateGlobalStats({ portalUsed: true });
-            
-            if (portal.isWorldPortal) {
-                message += `${STAT_EMOJI.PORTAL} Вы вошли в портал...\n\n`;
-
-                const width = session.mode === 'pc' ? WORLD_PC_WIDTH : WORLD_MOBILE_WIDTH;
-                const height = session.mode === 'pc' ? WORLD_PC_HEIGHT : WORLD_MOBILE_HEIGHT;
-
-                world.setup(width, height);
-                world.generate();
-                player.setup(width, height, player.name);
-                player.clearAttributes();
-                player.setRandomLocation();
-
-                const nx = player.getX();
-                const ny = player.getY();
-                world.generateNPC(nx, ny);
-                world.generateMerchant(nx, ny);
-                world.generateQuestGiver(nx, ny);
-                world.generateItems(nx, ny);
-                world.generatePortals(nx, ny);
-                player.markCellVisited(nx, ny);
-
-                world.recalculateNPCsForLevel(player.heroLevel);
-
-                message += `Вы прибыли в новый мир: *${world.worldName}*\n\n`;
-
-                const locationMessage =
-                    world.GetLocationText(nx, ny, player) +
-                    player.getLocationCoords() +
-                    world.printWorldMap(nx, ny);
-                message += locationMessage;
-
-                updateGlobalStats({ worldChange: true });
-            } else {
-                let newX, newY;
-                do {
-                    newX = Math.floor(Math.random() * world.width);
-                    newY = Math.floor(Math.random() * world.height);
-                } while (newX === x && newY === y);
-
-                player.setPosition(newX, newY);
-                const portalAtNewLocation = world.getPortalAtLocation(newX, newY);
-                if (portalAtNewLocation) {
-                    portalAtNewLocation.visited = true;
-                }
-                message += `${STAT_EMOJI.PORTAL} Вы зашли в портал и телепортировались в случайную точку мира!\n\n`;
-                
-                const xpForNextLevel = player.getXPToNextLevel();
-                const xpReward = Math.floor(xpForNextLevel / 2);
-                const expResult = player.addExperienceForAction(xpReward);
-                message += `✨ Получено опыта: +${xpReward}\n`;
-                if (expResult.leveledUp && expResult.statsGained) {
-                    message += `\n${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                    message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                    message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
-                }
-                message += '\n';
-
-                const locationMessage =
-                    world.GetLocationText(newX, newY, player) +
-                    player.getLocationCoords() +
-                    world.printWorldMap(newX, newY);
-                message += locationMessage;
-            }
-        }
-
-        message += player.getPlayerDescription() + '\n';
-
-        const buttons = generateInlineButtons(
-            world.getAvailableDirections(player.getX(), player.getY()),
-            world.getAvailableActions(player.getX(), player.getY())
-        );
-
-        if (query.message) {
-            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-                chat_id: currentChatID,
-                message_id: query.message.message_id,
-            });
-        }
-
-        bot.sendMessage(currentChatID, message, buttons);
     }
 
     bot.answerCallbackQuery(query.id);
 });
+
+// Запуск бота
+bot.on('polling_error', (error) => {
+    console.error('[POLLING ERROR]', error);
+});
+
+bot.startPolling();
+console.log('Bot started and waiting for messages...');
