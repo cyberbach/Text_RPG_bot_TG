@@ -9,7 +9,7 @@ import { NPC, NPC_TYPE } from './NPC.mjs';
 import { CharacterNames } from './TextEnums/CharacterNames.mjs';
 import { Item } from './Item.mjs';
 import { Portal } from './Portal.mjs';
-import { DEBUG_MERCHANT_QUEST_SPAWN, SPAWN_CHANCES, NPC_SETTINGS, PORTAL_SETTINGS, DEBUG_PORTAL_SPAWN } from './GameSetup.mjs';
+import { DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_PORTAL_MASS_SPAWN, DEBUG_LOG_SPAWN, SPAWN_CHANCES, NPC_SETTINGS, PORTAL_SETTINGS } from './GameSetup.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 
 export class WorldGenerator {
@@ -69,7 +69,8 @@ export class WorldGenerator {
             return `${randomAdj} ${randomName}`;
         };
 
-        if (DEBUG_MERCHANT_QUEST_SPAWN) {
+        if (DEBUG_MERCHANT_QUEST_MASS_SPAWN) {
+            console.log('[DEBUG] Spawning merchants on all cells...');
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     if (x === excludeX && y === excludeY) continue;
@@ -85,20 +86,25 @@ export class WorldGenerator {
                     this.npcs.push(merchant);
                 }
             }
-        } else if (Math.random() < SPAWN_CHANCES.MERCHANT) {
-            const merchant = new NPC();
-            merchant.npcType = NPC_TYPE.MERCHANT;
-            merchant.agressive = false;
-            merchant.merchantPrice = 10 + Math.floor(Math.random() * 20);
-            merchant.name = generateName();
-            
-            merchant.x = Math.floor(Math.random() * this.width);
-            merchant.y = Math.floor(Math.random() * this.height);
-            if (merchant.x === excludeX && merchant.y === excludeY) {
-                merchant.x = (merchant.x + 1) % this.width;
+            console.log(`[DEBUG] Merchants spawned: ${this.npcs.filter(n => n.npcType === NPC_TYPE.MERCHANT).length}`);
+        } else {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (x === excludeX && y === excludeY) continue;
+                    if (this.hasAggressiveNPC(x, y)) continue;
+
+                    if (Math.random() < SPAWN_CHANCES.MERCHANT) {
+                        const merchant = new NPC();
+                        merchant.npcType = NPC_TYPE.MERCHANT;
+                        merchant.agressive = false;
+                        merchant.x = x;
+                        merchant.y = y;
+                        merchant.merchantPrice = 10 + Math.floor(Math.random() * 20);
+                        merchant.name = generateName();
+                        this.npcs.push(merchant);
+                    }
+                }
             }
-            
-            this.npcs.push(merchant);
         }
     }
 
@@ -112,7 +118,8 @@ export class WorldGenerator {
             return `${randomAdj} ${randomName}`;
         };
 
-        if (DEBUG_MERCHANT_QUEST_SPAWN) {
+        if (DEBUG_MERCHANT_QUEST_MASS_SPAWN) {
+            console.log('[DEBUG] Spawning quest givers on all cells...');
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     if (x === excludeX && y === excludeY) continue;
@@ -127,19 +134,24 @@ export class WorldGenerator {
                     this.npcs.push(questGiver);
                 }
             }
-        } else if (Math.random() < SPAWN_CHANCES.QUEST_GIVER) {
-            const questGiver = new NPC();
-            questGiver.npcType = NPC_TYPE.QUEST_GIVER;
-            questGiver.agressive = false;
-            questGiver.name = generateName();
-            
-            questGiver.x = Math.floor(Math.random() * this.width);
-            questGiver.y = Math.floor(Math.random() * this.height);
-            if (questGiver.x === excludeX && questGiver.y === excludeY) {
-                questGiver.x = (questGiver.x + 1) % this.width;
+            console.log(`[DEBUG] Quest givers spawned: ${this.npcs.filter(n => n.npcType === NPC_TYPE.QUEST_GIVER).length}`);
+        } else {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (x === excludeX && y === excludeY) continue;
+                    if (this.hasAggressiveNPC(x, y)) continue;
+
+                    if (Math.random() < SPAWN_CHANCES.QUEST_GIVER) {
+                        const questGiver = new NPC();
+                        questGiver.npcType = NPC_TYPE.QUEST_GIVER;
+                        questGiver.agressive = false;
+                        questGiver.x = x;
+                        questGiver.y = y;
+                        questGiver.name = generateName();
+                        this.npcs.push(questGiver);
+                    }
+                }
             }
-            
-            this.npcs.push(questGiver);
         }
     }
 
@@ -153,7 +165,7 @@ export class WorldGenerator {
             this.portals.push(portal);
         }
 
-        if (DEBUG_PORTAL_SPAWN) {
+        if (DEBUG_PORTAL_MASS_SPAWN) {
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     if (x === excludeX && y === excludeY) continue;
@@ -184,12 +196,16 @@ export class WorldGenerator {
 
     // Генерация всех предметов мира
     generateItems(excludeX, excludeY) {
-        // Расстановка Items
-        const maxItemsCount = this.height * this.width * 1.1;
-        for (let index = 0; index < maxItemsCount; index++) {
-            const newItem = new Item();
-            newItem.setup(this.width, this.height, excludeX, excludeY);
-            this.items.push(newItem);
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (x === excludeX && y === excludeY) continue;
+                
+                if (Math.random() < SPAWN_CHANCES.ITEM) {
+                    const newItem = new Item();
+                    newItem.setupAtLocation(x, y);
+                    this.items.push(newItem);
+                }
+            }
         }
     }
 
@@ -251,6 +267,8 @@ export class WorldGenerator {
 
                 if (a === j && b === i) {
                     displayLetter = '●'; // HERO ● ◆
+                } else if (this.getPortalAtLocation(j, i)?.visited) {
+                    displayLetter = '@';
                 }
 
                 firstLetterRow.push(displayLetter);
@@ -440,9 +458,15 @@ export class WorldGenerator {
             '***' + locationIDToRussian(locationName) + '***\n\n';
 
         if (locationName !== 'EMPTY') {
-            messageLocation += locationDescription + '\n\n';
+            messageLocation += locationDescription + ' ';
         }
-        messageLocation += this.getNPCsText(x, y);
+
+        if (player) {
+            messageLocation += this.getPortalHints(x, y);
+        }
+        messageLocation += '\n';
+
+        messageLocation += '\n' + this.getNPCsText(x, y);
         messageLocation += this.getPortalsText(x, y);
         messageLocation += this.getItemsText(x, y);
 
@@ -455,5 +479,29 @@ export class WorldGenerator {
         }
 
         return messageLocation;
+    }
+
+    // Подсказки о близости порталов
+    getPortalHints(x, y) {
+        if (this.portals.length === 0) return '';
+
+        let minDistance = Infinity;
+        
+        for (const portal of this.portals) {
+            const distance = Math.abs(portal.x - x) + Math.abs(portal.y - y);
+            if (distance < minDistance) {
+                minDistance = distance;
+            }
+        }
+
+        if (minDistance === 1) {
+            return 'Слышен звук портала.';
+        } else if (minDistance === 2) {
+            return 'Вдалеке виден блеск.';
+        } else if (minDistance === 3) {
+            return 'Чувствуется магия, где-то вдалеке.';
+        }
+
+        return '';
     }
 }

@@ -3,7 +3,7 @@ import { STAT_TEXT_LABELS } from './TextEnums/StatTextLabels.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 import { WeaponNames } from './TextEnums/WeaponNames.mjs';
 import { HealItemNames } from './TextEnums/HealItemNames.mjs';
-import { DEBUG_ITEMS_CREATION, ITEM_SETTINGS } from './GameSetup.mjs';
+import { DEBUG_ITEMS_CREATION, ITEM_SETTINGS, SPAWN_CHANCES } from './GameSetup.mjs';
 import { ITEM_TEXT } from './TextEnums/ItemTextLabels.mjs';
 
 export class Item {
@@ -28,20 +28,20 @@ export class Item {
             this.y = Math.floor(Math.random() * worldHeight);
         }
 
-        if (Math.random() > 0.5) {
+        if (Math.random() < SPAWN_CHANCES.WEAPON) {
             this.isHealing = false;
             this.isWeapon = true;
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             
             const { WEAPON_MIN_DAMAGE, WEAPON_MAX_DAMAGE } = ITEM_SETTINGS.WORLD_ITEM;
-            const damageType = Math.floor(Math.random() * 3);
-            if (damageType === 0) {
+            const type = Math.floor(Math.random() * 3);
+            if (type === 0) {
                 this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
                 this.maxAttackPower = 0;
-            } else if (damageType === 1) {
+            } else if (type === 1) {
                 this.minAttackPower = 0;
-                this.maxAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE * 2);
+                this.maxAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
             } else {
                 this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
                 this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
@@ -51,11 +51,17 @@ export class Item {
             this.isWeapon = false;
             const baseNames = Object.values(HealItemNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
-            if (Math.random() > 0.3) {
-                const { HEALING_MIN, HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+            
+            const type = Math.floor(Math.random() * 3);
+            const { HEALING_MIN, HEALING_MAX, MAX_HEALING_MIN, MAX_HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+            if (type === 0) {
                 this.health = HEALING_MIN + Math.floor(Math.random() * HEALING_MAX);
+                this.maxHealth = 0;
+            } else if (type === 1) {
+                this.health = 0;
+                this.maxHealth = MAX_HEALING_MIN + Math.floor(Math.random() * MAX_HEALING_MAX);
             } else {
-                const { MAX_HEALING_MIN, MAX_HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+                this.health = HEALING_MIN + Math.floor(Math.random() * HEALING_MAX);
                 this.maxHealth = MAX_HEALING_MIN + Math.floor(Math.random() * MAX_HEALING_MAX);
             }
         }
@@ -87,35 +93,41 @@ export class Item {
             return;
         }
 
-        if (Math.random() > 0.5) {
+        if (Math.random() < SPAWN_CHANCES.WEAPON) {
             this.isHealing = false;
             this.isWeapon = true;
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             
-            const { MIN_DAMAGE, MAX_DAMAGE } = ITEM_SETTINGS.WEAPON;
-            const damageType = Math.floor(Math.random() * 3);
-            if (damageType === 0) {
-                this.minAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE);
+            const { WEAPON_MIN_DAMAGE, WEAPON_MAX_DAMAGE } = ITEM_SETTINGS.WORLD_ITEM;
+            const type = Math.floor(Math.random() * 3);
+            if (type === 0) {
+                this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
                 this.maxAttackPower = 0;
-            } else if (damageType === 1) {
+            } else if (type === 1) {
                 this.minAttackPower = 0;
-                this.maxAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE * 2);
+                this.maxAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
             } else {
-                this.minAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE);
-                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * MAX_DAMAGE);
+                this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
+                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
             }
         } else {
             this.isHealing = true;
             this.isWeapon = false;
             const baseNames = Object.values(HealItemNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
-            if (Math.random() > 0.5) {
-                const { HEALTH_MIN, HEALTH_MAX } = ITEM_SETTINGS.HEALING;
-                this.health = HEALTH_MIN + Math.floor(Math.random() * HEALTH_MAX);
+            
+            const type = Math.floor(Math.random() * 3);
+            const { HEALING_MIN, HEALING_MAX, MAX_HEALING_MIN, MAX_HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+            if (type === 0) {
+                this.health = HEALING_MIN + Math.floor(Math.random() * HEALING_MAX);
+                this.maxHealth = 0;
+            } else if (type === 1) {
+                this.health = 0;
+                this.maxHealth = MAX_HEALING_MIN + Math.floor(Math.random() * MAX_HEALING_MAX);
             } else {
-                const { MAX_HEALTH_MIN, MAX_HEALTH_MAX } = ITEM_SETTINGS.HEALING;
-                this.maxHealth = MAX_HEALTH_MIN + Math.floor(Math.random() * MAX_HEALTH_MAX);
+                this.health = HEALING_MIN + Math.floor(Math.random() * HEALING_MAX);
+                this.maxHealth = MAX_HEALING_MIN + Math.floor(Math.random() * MAX_HEALING_MAX);
             }
         }
 

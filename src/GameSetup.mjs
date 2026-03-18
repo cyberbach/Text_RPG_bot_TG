@@ -1,19 +1,25 @@
 // Настройки игры и отладки
 
-export const DEBUG_GAME = false;
-export const DEBUG_SHOW_TUTORIAL_TO_NEW_PLAYER = false;
-export const DEBUG_NPC_CREATION = false;
-export const DEBUG_ITEMS_CREATION = false;
-export const DEBUG_MERCHANT_QUEST_SPAWN = false;
-export const DEBUG_PORTAL = false;
-export const DEBUG_PORTAL_SPAWN = false; // Спавн порталов на все клетки (для тестирования)
+export const DEBUG_GAME = false;                          // Общая отладка игры
+export const DEBUG_SHOW_TUTORIAL_TO_NEW_PLAYER = false;   // Показывать туториал новым игрокам
+export const DEBUG_NPC_CREATION = false;                  // Логирование создания NPC
+export const DEBUG_ITEMS_CREATION = false;                // Логирование создания предметов
+
+// DEBUG_*_MASS_SPAWN - спавнит сущности на ВСЕ клетки карты (для тестирования)
+// DEBUG_LOG_SPAWN - логирует статистику заспавненных сущностей (без массового спавна)
+export const DEBUG_MERCHANT_QUEST_MASS_SPAWN = false;     // Спавн торговцев/квестодателей на все клетки
+export const DEBUG_PORTAL_MASS_SPAWN = false;              // Спавн порталов на все клетки
+export const DEBUG_LOG_SPAWN = true;                      // Логирование статистики спавна (порталы, предметы, NPC)
+export const DEBUG_LOG_PORTAL = false;                     // Логирование создания порталов
 
 // Вероятности спавна сущностей (0.0 - 1.0)
 export const SPAWN_CHANCES = Object.freeze({
-    MONSTER: 0.4,
-    MERCHANT: 0.15,
-    QUEST_GIVER: 0.15,
+    MONSTER: 0.3,
+    MERCHANT: 0.05,
+    QUEST_GIVER: 0.05,
     PORTAL: 0.1,
+    ITEM: 0.15,
+    WEAPON: 0.12,
 });
 
 // Настройки предметов
@@ -44,7 +50,7 @@ export const ITEM_SETTINGS = Object.freeze({
         WEAPON_MAX_DAMAGE: 8,
         HEALING_MIN: 1,
         HEALING_MAX: 10,
-        MAX_HEALING_MIN: 0,
+        MAX_HEALING_MIN: 1,
         MAX_HEALING_MAX: 10,
     }),
 });

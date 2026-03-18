@@ -5,7 +5,8 @@ import { MonsterNames } from './TextEnums/MonsterNames.mjs';
 import { NPC_TEXT } from './TextEnums/NPCTextLabels.mjs';
 
 export const NPC_TYPE = Object.freeze({
-    MONSTER: 'monster',
+    AGGRESSIVE: 'aggressive',
+    NEUTRAL: 'neutral',
     MERCHANT: 'merchant',
     QUEST_GIVER: 'quest_giver',
 });
@@ -23,7 +24,7 @@ export class NPC {
         this.maxAttackPower = BASE_ATTACK.MAX;
         this.agressive = false;
         this.name = '';
-        this.npcType = NPC_TYPE.MONSTER;
+        this.npcType = NPC_TYPE.NEUTRAL;
         this.questCompleted = false;
         this.merchantUsed = false;
         this.merchantPrice = 0;
@@ -50,9 +51,10 @@ export class NPC {
 
         this.name = `${randomAdj} ${randomBaseName}`;
         this.agressive = Math.random() >= 0.5;
+        this.npcType = this.agressive ? NPC_TYPE.AGGRESSIVE : NPC_TYPE.NEUTRAL;
 
         if (DEBUG_NPC_CREATION) {
-            console.log('Created NPC:', this.name, ' at ', this.x, '/', this.y);
+            console.log('Created NPC:', this.name, ' at ', this.x, '/', this.y, '- Type:', this.npcType);
         }
     }
 
@@ -85,7 +87,7 @@ export class NPC {
     }
 
     isAggressiveMonster() {
-        return this.agressive && this.npcType === NPC_TYPE.MONSTER;
+        return this.npcType === NPC_TYPE.AGGRESSIVE;
     }
 
     isAggressive() {

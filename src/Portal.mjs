@@ -1,4 +1,4 @@
-import { DEBUG_PORTAL } from './GameSetup.mjs';
+import { DEBUG_LOG_PORTAL } from './GameSetup.mjs';
 import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
 
 const PORTAL_NAME_PARTS = {
@@ -16,6 +16,7 @@ export class Portal {
         this.y = 0;
         this.isWorldPortal = false;
         this.name = '';
+        this.visited = false;
     }
 
     setup(worldWidth, worldHeight, excludeX, excludeY, isWorldPortal = false) {
@@ -33,7 +34,7 @@ export class Portal {
         const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
         this.name = `${randomAdj} ${PORTAL_NAME_PARTS.SUFFIX}`;
 
-        if (DEBUG_PORTAL) {
+        if (DEBUG_LOG_PORTAL) {
             console.log('[PORTAL] World Portal:', this.name, '- coords:', this.x, '/', this.y);
         }
     }

@@ -10,7 +10,8 @@ import { allAgressiveNPCAttackPlayer, playerAttackNPC } from './src/Game.mjs';
 import { DIRECTIONS } from './src/MovementDirections.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
 import { initEvent, getCurrentEventName, tickEventDuration, getHitChanceModifier } from './src/EventSystem.mjs';
-import { PORTAL_SETTINGS } from './src/GameSetup.mjs';
+import { PORTAL_SETTINGS, DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_LOG_SPAWN } from './src/GameSetup.mjs';
+import { NPC_TYPE } from './src/NPC.mjs';
 import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
 import dotenv from 'dotenv';
 
@@ -183,6 +184,25 @@ function setupNewGame(session, { width, height, playerName, mode }) {
     session.world.generatePortals(x, y);
     
     session.player.markCellVisited(x, y);
+
+    if (DEBUG_MERCHANT_QUEST_MASS_SPAWN || DEBUG_LOG_SPAWN) {
+        const npcs = session.world.npcs;
+        const merchants = npcs.filter(n => n.npcType === NPC_TYPE.MERCHANT);
+        const questGivers = npcs.filter(n => n.npcType === NPC_TYPE.QUEST_GIVER);
+        const aggressive = npcs.filter(n => n.npcType === NPC_TYPE.AGGRESSIVE);
+        const neutral = npcs.filter(n => n.npcType === NPC_TYPE.NEUTRAL);
+
+        console.log(`[DEBUG] === WORLD SPAWN STATS ===`);
+        console.log(`[DEBUG] NPCs: ${npcs.length}`);
+        console.log(`[DEBUG]   Aggressive: ${aggressive.length}`);
+        console.log(`[DEBUG]   Neutral: ${neutral.length + merchants.length + questGivers.length} (Neutral creatures: ${neutral.length}, Merchants: ${merchants.length}, Quest Givers: ${questGivers.length})`);
+        console.log(`[DEBUG] Portals: ${session.world.portals.length}`);
+        console.log(`[DEBUG] Items: ${session.world.items.length}`);
+        const weapons = session.world.items.filter(i => i.isWeapon).length;
+        const healing = session.world.items.filter(i => i.isHealing).length;
+        const coins = session.world.items.filter(i => i.isCoin).length;
+        console.log(`[DEBUG]   Weapons: ${weapons}, Healing: ${healing}, Coins: ${coins}`);
+    }
 
     return { x, y };
 }
@@ -563,26 +583,33 @@ bot.on('callback_query', (query) => {
                 }
             }
 
-            if (!player.isCellVisited(x, y)) {
-                world.recalculateNPCsForLevel(player.heroLevel);
-                player.markCellVisited(x, y);
-            }
+            if (!isPlayerDied) {
+                const portalAtNewLocation = world.getPortalAtLocation(x, y);
+                if (portalAtNewLocation) {
+                    portalAtNewLocation.visited = true;
+                }
 
-            const weatherChanged = tickEventDuration();
+                if (!player.isCellVisited(x, y)) {
+                    world.recalculateNPCsForLevel(player.heroLevel);
+                    player.markCellVisited(x, y);
+                }
 
-            const locationMessage =
-                world.GetLocationText(x, y, player) +
-                player.getLocationCoords() +
-                world.printWorldMap(x, y);
-            
-            let moveMessage = `Вы перешли на ${directionName}`;
-            if (weatherChanged) {
-                const hitChance = player.getHitChance(getHitChanceModifier());
-                moveMessage += `. ${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
+                const weatherChanged = tickEventDuration();
+
+                const locationMessage =
+                    world.GetLocationText(x, y, player) +
+                    player.getLocationCoords() +
+                    world.printWorldMap(x, y);
+                
+                let moveMessage = `Вы перешли на ${directionName}`;
+                if (weatherChanged) {
+                    const hitChance = player.getHitChance(getHitChanceModifier());
+                    moveMessage += `. ${getCurrentEventName()} ${STAT_EMOJI.ACCURACY}${hitChance}% точности при атаке.`;
+                }
+                moveMessage += '\n\n';
+                
+                message += moveMessage + locationMessage;
             }
-            moveMessage += '\n\n';
-            
-            message += moveMessage + locationMessage;
 
             const buttons = isPlayerDied 
                 ? generateDeathButtons()
@@ -956,6 +983,7 @@ bot.on('callback_query', (query) => {
         if (!portal) {
             message += 'Здесь нет портала.\n';
         } else {
+            portal.visited = true;
             updatePlayerStats(session, { portalUsed: true });
             updateGlobalStats({ portalUsed: true });
             
@@ -999,6 +1027,10 @@ bot.on('callback_query', (query) => {
                 } while (newX === x && newY === y);
 
                 player.setPosition(newX, newY);
+                const portalAtNewLocation = world.getPortalAtLocation(newX, newY);
+                if (portalAtNewLocation) {
+                    portalAtNewLocation.visited = true;
+                }
                 message += `${STAT_EMOJI.PORTAL} Вы зашли в портал и телепортировались в случайную точку мира!\n\n`;
                 
                 const xpForNextLevel = player.getXPToNextLevel();
