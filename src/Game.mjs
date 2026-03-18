@@ -1,5 +1,5 @@
 import { getHitChanceModifier } from './EventSystem.mjs';
-import { STAT_EMOJI } from './SmileInText.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 
 // Атака игроком всех NPC на текущей локации
 export function playerAttackNPC(inWorld, inPlayer) {

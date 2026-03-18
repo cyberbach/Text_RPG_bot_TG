@@ -1,25 +1,33 @@
-import { AdjectiveWords } from './AdjectiveWords.mjs';
-import { DEBUG_NPC_CREATION } from './GameDebug.mjs';
-import { STAT_EMOJI } from './SmileInText.mjs';
+import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
+import { DEBUG_NPC_CREATION, NPC_SETTINGS, QUEST_SETTINGS, NPC_TEXT } from './GameSetup.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
+import { MonsterNames } from './TextEnums/MonsterNames.mjs';
+
+export const NPC_TYPE = Object.freeze({
+    MONSTER: 'monster',
+    MERCHANT: 'merchant',
+    QUEST_GIVER: 'quest_giver',
+});
 
 export class NPC {
-    // Конструктор с инициализацией базовых параметров
     constructor() {
-        this.maxHealth =
-            1 +
-            Math.floor(Math.random() * 34) +
-            Math.floor(Math.random() * 34) +
-            Math.floor(Math.random() * 33);
-        this.maxArmor = 50;
+        const { BASE_HEALTH, BASE_ARMOR, BASE_ATTACK, ATTACK_RANGE } = NPC_SETTINGS;
+        this.maxHealth = BASE_HEALTH.MIN + 
+            Math.floor(Math.random() * (BASE_HEALTH.MAX - BASE_HEALTH.MIN + 1)) +
+            Math.floor(Math.random() * (BASE_HEALTH.MAX - BASE_HEALTH.MIN + 1));
+        this.maxArmor = BASE_ARMOR;
         this.health = this.maxHealth;
         this.armor = 0;
-        this.minAttackPower = 1;
-        this.maxAttackPower = 10;
+        this.minAttackPower = BASE_ATTACK.MIN;
+        this.maxAttackPower = BASE_ATTACK.MAX;
         this.agressive = false;
         this.name = '';
+        this.npcType = NPC_TYPE.MONSTER;
+        this.questCompleted = false;
+        this.merchantUsed = false;
+        this.merchantPrice = 0;
     }
 
-    // Генерация NPC в случайной позиции
     setup(worldWidth, worldHeight, excludeX, excludeY) {
         this.x = Math.floor(Math.random() * worldWidth);
         this.y = Math.floor(Math.random() * worldHeight);
@@ -29,19 +37,15 @@ export class NPC {
             this.y = Math.floor(Math.random() * worldHeight);
         }
 
-        this.minAttackPower = 1 + Math.floor(Math.random() * 5);
-        this.maxAttackPower =
-            this.minAttackPower + Math.floor(Math.random() * 17);
+        const { BASE_ATTACK, ATTACK_RANGE } = NPC_SETTINGS;
+        this.minAttackPower = BASE_ATTACK.MIN + Math.floor(Math.random() * (BASE_ATTACK.MAX - BASE_ATTACK.MIN + 1));
+        this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * (ATTACK_RANGE + 1));
 
-        // случайное прилагательное
         const adjectives = Object.values(AdjectiveWords);
-        const randomAdj =
-            adjectives[Math.floor(Math.random() * adjectives.length)];
+        const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
 
-        // случайное название монстра
         const baseNames = Object.values(MonsterNames);
-        const randomBaseName =
-            baseNames[Math.floor(Math.random() * baseNames.length)];
+        const randomBaseName = baseNames[Math.floor(Math.random() * baseNames.length)];
 
         this.name = `${randomAdj} ${randomBaseName}`;
         this.agressive = Math.random() >= 0.5;
@@ -51,107 +55,72 @@ export class NPC {
         }
     }
 
-    // Получение описания NPC для отображения
     getNpcDescription() {
-        const attackString =
-            ' ' + STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
+        const attackString = STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
+        let descriptionString = STAT_EMOJI.MONSTER + ' ' + this.name + ' ';
 
-        let descriptionString = '';
-        descriptionString += STAT_EMOJI.MONSTER + ' ' + this.name + ' ';
         if (this.agressive) {
             descriptionString += STAT_EMOJI.HEALTH + ' ' + this.health + attackString;
+        } else if (this.npcType === NPC_TYPE.MERCHANT && !this.merchantUsed) {
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.MERCHANT_ASKING + STAT_EMOJI.COINS + ' ' + this.merchantPrice + NPC_TEXT.MONET_SUFFIX;
+        } else if (this.npcType === NPC_TYPE.QUEST_GIVER && !this.questCompleted) {
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.QUEST_NEED_HELP;
+        } else if (this.npcType === NPC_TYPE.QUEST_GIVER && this.questCompleted) {
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+        } else if (this.npcType === NPC_TYPE.MERCHANT && this.merchantUsed) {
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
         } else {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (мирный)';
+            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
         }
         descriptionString += '\n';
 
         return descriptionString;
     }
 
-    // Изменение здоровья (урон/лечение), NPC становится агрессивным
     modifyHealth(amount) {
         this.health += amount;
         this.agressive = true;
-
         return this.health > 0;
     }
+
+    isAggressiveMonster() {
+        return this.agressive && this.npcType === NPC_TYPE.MONSTER;
+    }
+
+    isAggressive() {
+        return this.agressive && this.npcType !== NPC_TYPE.MERCHANT;
+    }
+
+    isMerchant() {
+        return this.npcType === NPC_TYPE.MERCHANT && !this.merchantUsed;
+    }
+
+    isQuestGiver() {
+        return this.npcType === NPC_TYPE.QUEST_GIVER && !this.questCompleted;
+    }
+
+    getQuestReward() {
+        const hasCoins = Math.random() > 0.3;
+        const { COINS_REWARD } = QUEST_SETTINGS;
+        const coinsReward = hasCoins ? 
+            COINS_REWARD.MIN + Math.floor(Math.random() * (COINS_REWARD.MAX - COINS_REWARD.MIN + 1)) : 0;
+        
+        const hasItem = Math.random() > 0.4;
+        const hasGoodItem = Math.random() > 0.5;
+        const { WEAPON_REWARD, HEALING_REWARD } = QUEST_SETTINGS;
+        const itemReward = hasItem ? {
+            isWeapon: hasGoodItem,
+            isHealing: !hasGoodItem,
+            minAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK) : 0,
+            maxAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK * 1.5) : 0,
+            health: !hasGoodItem ? HEALING_REWARD.HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.HEALTH_MAX - HEALING_REWARD.HEALTH_MIN)) : 0,
+            maxHealth: !hasGoodItem ? HEALING_REWARD.MAX_HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.MAX_HEALTH_MAX - HEALING_REWARD.MAX_HEALTH_MIN)) : 0,
+        } : null;
+
+        return { coinsReward, itemReward };
+    }
+
+    didHelpSucceed() {
+        return Math.random() > 0.3;
+    }
 }
-
-const MonsterNames = Object.freeze({
-    // Классические существа
-    GOBLIN: 'гоблин',
-    OGRE: 'огр',
-    TROLL: 'тролль',
-    ORC: 'орк',
-    GHOUL: 'гуль',
-
-    // Мифические существа
-    GRIFFIN: 'грифон',
-    BASILISK: 'василиск',
-    CHIMERA: 'химера',
-    HARPY: 'гарпия',
-    KRAKEN: 'кракен',
-
-    // Нежить
-    LICH: 'лич',
-    WRAITH: 'призрак',
-    BANSHEE: 'банши',
-    ZOMBIE: 'зомби',
-    SKELETON: 'скелет',
-
-    // Демонические существа
-    SUCCUBUS: 'суккуб',
-    IMP: 'бесёнок',
-    HELLHOUND: 'адский пёс',
-    PIT_FIEND: 'демон бездны',
-    ABYSSAL: 'абиссаль',
-
-    // Элементали
-    EARTH_ELEMENTAL: 'земляной элементаль',
-    FIRE_ELEMENTAL: 'огненный элементаль',
-    WATER_ELEMENTAL: 'водяной элементаль',
-    AIR_ELEMENTAL: 'воздушный элементаль',
-    STORM_ELEMENTAL: 'грозовой элементаль',
-
-    // Рептилии и драконы
-    WYRM: 'черведракон',
-    DRAKE: 'драконид',
-    WYVERN: 'виверна',
-    SALAMANDER: 'саламандра',
-    COCKATRICE: 'кокатрис',
-
-    // Лесные существа
-    TREANT: 'древень',
-    DRYAD: 'дриада',
-    WISP: 'блуждающий огонёк',
-    THORN_BEAST: 'терновый зверь',
-    MOSS_TROLL: 'моховой тролль',
-
-    // Подземные монстры
-    CAVE_CRAWLER: 'пещерный ползун',
-    DEEP_DWELLER: 'глубинный житель',
-    ROCK_GOLEM: 'каменный голем',
-    TROGLODYTE: 'троглодит',
-    GIANT_BAT: 'гигантская летучая мышь',
-
-    // Магические существа
-    SHADOW_STALKER: 'теневик',
-    CRYSTAL_GOLEM: 'хрустальный голем',
-    ARCANE_ABERRATION: 'магическое уродство',
-    MANA_VAMPIRE: 'мана-вампир',
-    SPELL_WEAVER: 'ткач заклинаний',
-
-    // Гибриды
-    CENTAUR: 'кентавр',
-    MINOTAUR: 'минотавр',
-    MERFOLK: 'морской народец',
-    SATYR: 'сатир',
-    GORGON: 'горгона',
-
-    // Инсектоиды
-    GIANT_SPIDER: 'гигантский паук',
-    SCORPIONID: 'скорпионоид',
-    MANTIS_WARRIOR: 'богомол-воин',
-    HIVE_QUEEN: 'матка улья',
-    SWARM_LORD: 'повелитель роя',
-});

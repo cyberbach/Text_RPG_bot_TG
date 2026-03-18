@@ -30,4 +30,16 @@ export const TG_ACTIONS = {
         text: 'Карта 🗺️',
         callback: 'map',
     },
+    buy: {
+        text: 'Купить 💰',
+        callback: 'buy',
+    },
+    help: {
+        text: 'Помочь 🤝',
+        callback: 'help',
+    },
+    portal: {
+        text: 'В портал 🌀',
+        callback: 'portal',
+    },
 };

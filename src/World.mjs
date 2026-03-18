@@ -3,9 +3,14 @@ import {
     getRandomLocationDescription,
     locationIDToRussian,
 } from './LocationTypes.mjs';
-import { WORLD_NAMES } from './WorldTypes.mjs';
-import { NPC } from './NPC.mjs';
+import { WORLD_NAMES } from './TextEnums/WorldNames.mjs';
+import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
+import { NPC, NPC_TYPE } from './NPC.mjs';
+import { CharacterNames } from './TextEnums/CharacterNames.mjs';
 import { Item } from './Item.mjs';
+import { Portal } from './Portal.mjs';
+import { DEBUG_MERCHANT_QUEST_SPAWN, SPAWN_CHANCES, NPC_SETTINGS, PORTAL_SETTINGS, DEBUG_PORTAL_SPAWN } from './GameSetup.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 
 export class WorldGenerator {
     constructor() {}
@@ -17,6 +22,7 @@ export class WorldGenerator {
         this.maze = [];
         this.npcs = [];
         this.items = [];
+        this.portals = [];
         this.worldName = '';
     }
 
@@ -51,6 +57,122 @@ export class WorldGenerator {
             newNPC.setup(this.width, this.height, excludeX, excludeY);
             this.npcs.push(newNPC);
         }
+    }
+
+    // Создание NPC-торговца
+    generateMerchant(excludeX, excludeY) {
+        const generateName = () => {
+            const adjectives = Object.values(AdjectiveWords);
+            const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+            const names = Object.values(CharacterNames);
+            const randomName = names[Math.floor(Math.random() * names.length)];
+            return `${randomAdj} ${randomName}`;
+        };
+
+        if (DEBUG_MERCHANT_QUEST_SPAWN) {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (x === excludeX && y === excludeY) continue;
+                    if (this.hasAggressiveNPC(x, y)) continue;
+
+                    const merchant = new NPC();
+                    merchant.npcType = NPC_TYPE.MERCHANT;
+                    merchant.agressive = false;
+                    merchant.x = x;
+                    merchant.y = y;
+                    merchant.merchantPrice = 10 + Math.floor(Math.random() * 20);
+                    merchant.name = generateName();
+                    this.npcs.push(merchant);
+                }
+            }
+        } else if (Math.random() < SPAWN_CHANCES.MERCHANT) {
+            const merchant = new NPC();
+            merchant.npcType = NPC_TYPE.MERCHANT;
+            merchant.agressive = false;
+            merchant.merchantPrice = 10 + Math.floor(Math.random() * 20);
+            merchant.name = generateName();
+            
+            merchant.x = Math.floor(Math.random() * this.width);
+            merchant.y = Math.floor(Math.random() * this.height);
+            if (merchant.x === excludeX && merchant.y === excludeY) {
+                merchant.x = (merchant.x + 1) % this.width;
+            }
+            
+            this.npcs.push(merchant);
+        }
+    }
+
+    // Создание NPC-квестодателя
+    generateQuestGiver(excludeX, excludeY) {
+        const generateName = () => {
+            const adjectives = Object.values(AdjectiveWords);
+            const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+            const names = Object.values(CharacterNames);
+            const randomName = names[Math.floor(Math.random() * names.length)];
+            return `${randomAdj} ${randomName}`;
+        };
+
+        if (DEBUG_MERCHANT_QUEST_SPAWN) {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (x === excludeX && y === excludeY) continue;
+                    if (this.hasAggressiveNPC(x, y)) continue;
+
+                    const questGiver = new NPC();
+                    questGiver.npcType = NPC_TYPE.QUEST_GIVER;
+                    questGiver.agressive = false;
+                    questGiver.x = x;
+                    questGiver.y = y;
+                    questGiver.name = generateName();
+                    this.npcs.push(questGiver);
+                }
+            }
+        } else if (Math.random() < SPAWN_CHANCES.QUEST_GIVER) {
+            const questGiver = new NPC();
+            questGiver.npcType = NPC_TYPE.QUEST_GIVER;
+            questGiver.agressive = false;
+            questGiver.name = generateName();
+            
+            questGiver.x = Math.floor(Math.random() * this.width);
+            questGiver.y = Math.floor(Math.random() * this.height);
+            if (questGiver.x === excludeX && questGiver.y === excludeY) {
+                questGiver.x = (questGiver.x + 1) % this.width;
+            }
+            
+            this.npcs.push(questGiver);
+        }
+    }
+
+    // Генерация порталов
+    generatePortals(excludeX, excludeY) {
+        const { WORLD_PORTAL_COUNT } = PORTAL_SETTINGS;
+        
+        for (let i = 0; i < WORLD_PORTAL_COUNT; i++) {
+            const portal = new Portal();
+            portal.setup(this.width, this.height, excludeX, excludeY, true);
+            this.portals.push(portal);
+        }
+
+        if (DEBUG_PORTAL_SPAWN) {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (x === excludeX && y === excludeY) continue;
+
+                    const portal = new Portal();
+                    portal.setup(this.width, this.height, excludeX, excludeY, false);
+                    this.portals.push(portal);
+                }
+            }
+        } else if (Math.random() < SPAWN_CHANCES.PORTAL) {
+            const regularPortal = new Portal();
+            regularPortal.setup(this.width, this.height, excludeX, excludeY, false);
+            this.portals.push(regularPortal);
+        }
+    }
+
+    // Проверка наличия агрессивного NPC на клетке
+    hasAggressiveNPC(x, y) {
+        return this.npcs.some(npc => npc.isAggressiveMonster() && npc.x === x && npc.y === y);
     }
 
     // Создание одного предмета в указанной позиции
@@ -190,7 +312,7 @@ export class WorldGenerator {
 
         const aggresiveNpcs = [];
         this.npcs.forEach((npc) => {
-            if (npc.agressive && npc.x === a && npc.y === b) {
+            if (npc.isAggressive() && npc.x === a && npc.y === b) {
                 aggresiveNpcs.push(npc);
             }
         });
@@ -198,21 +320,34 @@ export class WorldGenerator {
             resultArray.push('attack');
         }
 
+        // Проверка наличия торговца
+        this.npcs.forEach((npc) => {
+            if (npc.isMerchant() && npc.x === a && npc.y === b) {
+                resultArray.push('buy');
+            }
+        });
+
+        // Проверка наличия квестодателя
+        this.npcs.forEach((npc) => {
+            if (npc.isQuestGiver() && npc.x === a && npc.y === b) {
+                resultArray.push('help');
+            }
+        });
+
         if (this.getItemsAtLocation(a, b).length > 0) {
             resultArray.push('use');
+        }
+
+        if (this.getPortalAtLocation(a, b)) {
+            resultArray.push('portal');
         }
 
         return resultArray;
     }
 
-    getNPCsAtLocation(a, b) {
-        const foundNPCs = [];
-        this.npcs.forEach((npc) => {
-            if (npc.x === a && npc.y === b) {
-                foundNPCs.push(npc);
-            }
-        });
-        return foundNPCs;
+    // Получение портала на локации
+    getPortalAtLocation(a, b) {
+        return this.portals.find(portal => portal.x === a && portal.y === b);
     }
 
     // Получение всех NPC на локации
@@ -253,30 +388,18 @@ export class WorldGenerator {
         return resultString;
     }
 
-    recalculateNPCsForLevel(playerLevel) {
-        if (playerLevel <= 1) return;
-        
-        const levelBonus = playerLevel - 1;
-        
-        this.npcs.forEach(npc => {
-            npc.minAttackPower += levelBonus;
-            npc.maxAttackPower += levelBonus * 2;
-            npc.health += levelBonus * 10;
-            npc.maxHealth += levelBonus * 10;
-        });
-    }
-
     // Пересчет характеристик NPC в зависимости от уровня игрока
     recalculateNPCsForLevel(playerLevel) {
         if (playerLevel <= 1) return;
         
+        const { ATTACK_BONUS_PER_LEVEL, BASE_HEALTH } = NPC_SETTINGS;
         const levelBonus = playerLevel - 1;
         
         this.npcs.forEach(npc => {
-            npc.minAttackPower += levelBonus;
-            npc.maxAttackPower += levelBonus * 2;
-            npc.health += levelBonus * 10;
-            npc.maxHealth += levelBonus * 10;
+            npc.minAttackPower += levelBonus * ATTACK_BONUS_PER_LEVEL.MIN;
+            npc.maxAttackPower += levelBonus * ATTACK_BONUS_PER_LEVEL.MAX;
+            npc.health += levelBonus * Math.floor(BASE_HEALTH.MAX / 10);
+            npc.maxHealth += levelBonus * Math.floor(BASE_HEALTH.MAX / 10);
         });
     }
 
@@ -296,10 +419,21 @@ export class WorldGenerator {
         return resultString;
     }
 
+    // Формирование текстового описания порталов для отображения
+    getPortalsText(x, y) {
+        let resultString = '';
+        const portal = this.getPortalAtLocation(x, y);
+
+        if (portal) {
+            resultString += STAT_EMOJI.PORTAL + ' ' + portal.getPortalDescription() + '\n';
+        }
+
+        return resultString;
+    }
+
     // Формирование полного описания локации (название + описание + NPC + предметы)
     GetLocationText(x, y) {
         const locationName = this.getLocationByXY(x, y).toUpperCase();
-        //const locationNameString = locationName.toUpperCase();
         const locationDescription = this.getLocationDescriptionByXY(x, y);
 
         let messageLocation =
@@ -309,7 +443,7 @@ export class WorldGenerator {
             messageLocation += locationDescription + '\n\n';
         }
         messageLocation += this.getNPCsText(x, y);
-
+        messageLocation += this.getPortalsText(x, y);
         messageLocation += this.getItemsText(x, y);
 
         return messageLocation;

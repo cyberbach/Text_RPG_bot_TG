@@ -5,11 +5,13 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { WorldGenerator } from './src/World.mjs';
 import { Player } from './src/Player.mjs';
+import { Item } from './src/Item.mjs';
 import { allAgressiveNPCAttackPlayer, playerAttackNPC } from './src/Game.mjs';
 import { DIRECTIONS } from './src/MovementDirections.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
 import { initEvent, getCurrentEventName, tickEventDuration, getHitChanceModifier } from './src/EventSystem.mjs';
-import { STAT_EMOJI } from './src/SmileInText.mjs';
+import { PORTAL_SETTINGS } from './src/GameSetup.mjs';
+import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -46,6 +48,10 @@ const globalStats = {
     worldsVisited: new Set(),
     totalGamesStarted: 0,
     totalCoins: 0,
+    questsCompleted: 0,
+    itemsPurchased: 0,
+    portalsUsed: 0,
+    deaths: 0,
 };
 
 // Обновление глобальной статистики (для всех игроков)
@@ -66,6 +72,10 @@ function updateGlobalStats(options) {
     if (options.worldName) {
         globalStats.worldsVisited.add(options.worldName);
     }
+    if (options.questCompleted) globalStats.questsCompleted++;
+    if (options.itemPurchased) globalStats.itemsPurchased++;
+    if (options.portalUsed) globalStats.portalsUsed++;
+    if (options.death) globalStats.deaths++;
 }
 
 // Формирование сообщения со статистикой
@@ -75,18 +85,24 @@ function getGlobalStatsMessage(playerStats) {
         `${STAT_EMOJI.MONSTER} Уникальных игроков: ${globalStats.uniquePlayers.size}\n` +
         `${STAT_EMOJI.WORLD_MAP} Миров создано: ${globalStats.worldsVisited.size}\n` +
         `${STAT_EMOJI.CHECK} Игр пройдено: ${globalStats.gamesCompleted}\n` +
+        `${STAT_EMOJI.DEAD} Смертей: ${globalStats.deaths}\n` +
         `${STAT_EMOJI.ATTACK} Всего урона нанесено: ${globalStats.totalDamageDealt}\n` +
         `${STAT_EMOJI.ARMOR} Всего урона получено: ${globalStats.totalDamageTaken}\n` +
         `${STAT_EMOJI.KILL} Всего монстров убито: ${globalStats.monstersKilled}\n` +
-        `${STAT_EMOJI.ITEMS} Всего предметов найдено: ${globalStats.itemsFound}\n` +
+        `${STAT_EMOJI.ITEMS} Предметов найдено: ${globalStats.itemsFound}\n` +
+        `${STAT_EMOJI.COINS} Предметов куплено: ${globalStats.itemsPurchased}\n` +
+        `${STAT_EMOJI.PORTAL} Порталов использовано: ${globalStats.portalsUsed}\n` +
         `${STAT_EMOJI.COINS} Всего монет: ${globalStats.totalCoins}\n` +
         `${STAT_EMOJI.LEVEL} Максимальный уровень: ${globalStats.maxHeroLevel}\n\n` +
         `📈 *СТАТИСТИКА ИГРОКА*\n\n` +
         `${STAT_EMOJI.CHECK} Игр пройдено: ${playerStats.gamesCompleted}\n` +
+        `${STAT_EMOJI.DEAD} Смертей: ${playerStats.deaths}\n` +
         `${STAT_EMOJI.ATTACK} Нанесено урона: ${playerStats.totalDamageDealt}\n` +
         `${STAT_EMOJI.ARMOR} Получено урона: ${playerStats.totalDamageTaken}\n` +
         `${STAT_EMOJI.KILL} Убито монстров: ${playerStats.monstersKilled}\n` +
         `${STAT_EMOJI.ITEMS} Найдено предметов: ${playerStats.itemsFound}\n` +
+        `${STAT_EMOJI.COINS} Куплено предметов: ${playerStats.itemsPurchased}\n` +
+        `${STAT_EMOJI.PORTAL} Использовано порталов: ${playerStats.portalsUsed}\n` +
         `${STAT_EMOJI.COINS} Монет: ${playerStats.totalCoins}\n` +
         `${STAT_EMOJI.LEVEL} Максимальный уровень: ${playerStats.maxHeroLevel}`;
 }
@@ -103,6 +119,10 @@ function updatePlayerStats(session, options) {
     if (options.heroLevel && options.heroLevel > ps.maxHeroLevel) {
         ps.maxHeroLevel = options.heroLevel;
     }
+    if (options.questCompleted) ps.questsCompleted++;
+    if (options.itemPurchased) ps.itemsPurchased++;
+    if (options.portalUsed) ps.portalsUsed++;
+    if (options.death) ps.deaths++;
 }
 
 // One game session per chat (in-memory only).
@@ -125,6 +145,10 @@ function createNewSession(chatId) {
             itemsFound: 0,
             maxHeroLevel: 1,
             totalCoins: 0,
+            questsCompleted: 0,
+            itemsPurchased: 0,
+            portalsUsed: 0,
+            deaths: 0,
         },
     };
     sessions.set(chatId, session);
@@ -153,7 +177,10 @@ function setupNewGame(session, { width, height, playerName, mode }) {
     const x = session.player.getX();
     const y = session.player.getY();
     session.world.generateNPC(x, y);
+    session.world.generateMerchant(x, y);
+    session.world.generateQuestGiver(x, y);
     session.world.generateItems(x, y);
+    session.world.generatePortals(x, y);
     
     session.player.markCellVisited(x, y);
 
@@ -356,14 +383,35 @@ bot.onText(/\/info/, (msg) => {
     bot.sendMessage(msg.chat.id, message, { parse_mode: 'Markdown' });
 });
 
+// Защита от спама: время последнего callback для каждого чата
+const lastCallbackTime = new Map();
+const CALLBACK_COOLDOWN = 500; // мс между обработкой callback от одного чата
+
 // ================= CALLBACK QUERY ===================
 // Обработка Inline-кнопок
 bot.on('callback_query', (query) => {
+    if (!query.data) return;
+    
     const action = query.data;
     const currentChatID = query.message.chat.id;
+    
+    // Защита от спама
+    const lastTime = lastCallbackTime.get(currentChatID) || 0;
+    if (Date.now() - lastTime < CALLBACK_COOLDOWN) {
+        bot.answerCallbackQuery(query.id, { text: 'Подождите...' });
+        return;
+    }
+    lastCallbackTime.set(currentChatID, Date.now());
+    
     const session = getSession(currentChatID);
     const world = session.world;
     const player = session.player;
+
+    // Проверка что игра инициализирована
+    if (!world.maze || world.maze.length === 0 || !player.maxWidth) {
+        bot.answerCallbackQuery(query.id, { text: 'Начните новую игру!' });
+        return;
+    }
 
     // ================== NEW GAME ======================
     if (action === 'new_game') {
@@ -392,7 +440,10 @@ bot.on('callback_query', (query) => {
         const px = session.player.getX();
         const py = session.player.getY();
         session.world.generateNPC(px, py);
+        session.world.generateMerchant(px, py);
+        session.world.generateQuestGiver(px, py);
         session.world.generateItems(px, py);
+        session.world.generatePortals(px, py);
         session.player.markCellVisited(px, py);
 
         updateGlobalStats({ 
@@ -510,8 +561,8 @@ bot.on('callback_query', (query) => {
                 updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
                 
                 if (npcAttackResult.stats.playerDied) {
-                    updateGlobalStats({ gameCompleted: true });
-                    updatePlayerStats(session, { gameCompleted: true });
+                    updateGlobalStats({ gameCompleted: true, death: true });
+                    updatePlayerStats(session, { gameCompleted: true, death: true });
                     message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
                 } else {
                     message += player.getPlayerDescription() + '\n';
@@ -584,14 +635,15 @@ bot.on('callback_query', (query) => {
         }
         const oneItemToUse =
             itemsToUse[Math.floor(Math.random() * itemsToUse.length)];
-        message = player.useItem(oneItemToUse);
+        const useResult = player.useItem(oneItemToUse);
+        message = useResult.text;
         player.addExperienceForAction(1);
         const indexToRemove = world.items.findIndex(
             (item) => item === oneItemToUse
         );
         world.items.splice(indexToRemove, 1);
         updateGlobalStats({ itemFound: true, heroLevel: player.heroLevel });
-        updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel });
+        updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel, coinsGained: useResult.coinsGained });
         message += player.getPlayerDescription() + '\n';
 
         const npcsAtLocation = world.getNPCsAtLocation(x, y);
@@ -605,8 +657,8 @@ bot.on('callback_query', (query) => {
             
             if (npcAttackResult.stats.playerDied) {
                 isPlayerDied = true;
-                updateGlobalStats({ gameCompleted: true });
-                updatePlayerStats(session, { gameCompleted: true });
+                updateGlobalStats({ gameCompleted: true, death: true });
+                updatePlayerStats(session, { gameCompleted: true, death: true });
                 message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
             } else {
                 message += player.getPlayerDescription() + '\n';
@@ -644,15 +696,35 @@ bot.on('callback_query', (query) => {
         y = player.getY();
 
         let playerAttackResult, npcAttackResult;
-        if (Math.random() > 0.5) {
-            playerAttackResult = playerAttackNPC(world, player);
-            npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
-            message += playerAttackResult.text + npcAttackResult.text;
-        } else {
-            npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
-            playerAttackResult = playerAttackNPC(world, player);
-            message += npcAttackResult.text + playerAttackResult.text;
+        
+        npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
+        
+        if (npcAttackResult.stats.playerDied) {
+            message += npcAttackResult.text;
+            
+            updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
+            updateGlobalStats({ gameCompleted: true, death: true });
+            updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
+            updatePlayerStats(session, { gameCompleted: true, death: true });
+            session.combatState = false;
+            message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+            
+            const buttons = generateDeathButtons();
+            
+            if (query.message) {
+                bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+                    chat_id: currentChatID,
+                    message_id: query.message.message_id,
+                });
+            }
+            
+            bot.sendMessage(currentChatID, message, buttons);
+            bot.answerCallbackQuery(query.id);
+            return;
         }
+        
+        playerAttackResult = playerAttackNPC(world, player);
+        message += npcAttackResult.text + playerAttackResult.text;
 
         updateGlobalStats({
             damageDealt: playerAttackResult.stats.damageDealt,
@@ -669,13 +741,6 @@ bot.on('callback_query', (query) => {
             coinsGained: playerAttackResult.stats.coinsGained,
         });
 
-        if (npcAttackResult.stats.playerDied) {
-            updateGlobalStats({ gameCompleted: true });
-            updatePlayerStats(session, { gameCompleted: true });
-            session.combatState = false;
-            message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
-        }
-
         message += '\n';
         let liveNPCs = world.getNPCsAtLocation(x, y);
         liveNPCs.forEach((npc) => {
@@ -688,19 +753,273 @@ bot.on('callback_query', (query) => {
             message +=
                 '\n' +
                 world.GetLocationText(x, y) +
-                // player.getLocationCoords() +
                 world.printWorldMap(x, y);
         }
 
-        if (!session.combatState) {
+        const buttons = generateInlineButtons(
+            world.getAvailableDirections(x, y),
+            world.getAvailableActions(x, y)
+        );
+
+        if (query.message) {
+            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+                chat_id: currentChatID,
+                message_id: query.message.message_id,
+            });
         }
 
-        const buttons = npcAttackResult.stats.playerDied
+        bot.sendMessage(currentChatID, message, buttons);
+    }
+
+    // ============ BUY ===============
+    if (action === 'buy') {
+        message = '';
+        x = player.getX();
+        y = player.getY();
+
+        let merchantFound = null;
+        world.npcs.forEach((npc) => {
+            if (npc.isMerchant() && npc.x === x && npc.y === y) {
+                merchantFound = npc;
+            }
+        });
+
+        if (!merchantFound) {
+            message += 'Здесь нет торговца.\n';
+        } else {
+            const price = merchantFound.merchantPrice;
+            
+            if (player.coins < price) {
+                message += `${merchantFound.name} просит ${price} монет за товар, но у вас недостаточно денег.\n`;
+                merchantFound.merchantUsed = true;
+            } else {
+                player.coins -= price;
+                updatePlayerStats(session, { coinsSpent: price, itemPurchased: true });
+                updateGlobalStats({ itemPurchased: true });
+                
+                const newItem = new Item();
+                newItem.setupAtLocation(x, y);
+                world.items.push(newItem);
+                
+                message += `${merchantFound.name} продал вам ${newItem.name} за ${price} монет.\n`;
+                merchantFound.merchantUsed = true;
+            }
+        }
+
+        message += player.getPlayerDescription() + '\n';
+        message +=
+            '\n' +
+            world.GetLocationText(x, y) +
+            player.getLocationCoords() +
+            world.printWorldMap(x, y);
+
+        const buttons = generateInlineButtons(
+            world.getAvailableDirections(x, y),
+            world.getAvailableActions(x, y)
+        );
+
+        if (query.message) {
+            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+                chat_id: currentChatID,
+                message_id: query.message.message_id,
+            });
+        }
+
+        bot.sendMessage(currentChatID, message, buttons);
+    }
+
+    // ============ HELP ===============
+    if (action === 'help') {
+        message = '';
+        x = player.getX();
+        y = player.getY();
+        let playerDied = false;
+
+        let questGiverFound = null;
+        world.npcs.forEach((npc) => {
+            if (npc.isQuestGiver() && npc.x === x && npc.y === y) {
+                questGiverFound = npc;
+            }
+        });
+
+        if (!questGiverFound) {
+            message += 'Здесь нет того, кому можно помочь.\n';
+        } else {
+            if (questGiverFound.didHelpSucceed()) {
+                const reward = questGiverFound.getQuestReward();
+                let rewardCount = 0;
+                
+                if (reward.coinsReward > 0) {
+                    const coinItem = new Item();
+                    coinItem.setupAtLocation(x, y);
+                    coinItem.isCoin = true;
+                    coinItem.coins = reward.coinsReward;
+                    coinItem.name = reward.coinsReward === 1 ? 'Монета' : (reward.coinsReward >= 5 && reward.coinsReward <= 20 ? 'Монеты' : 'Монет');
+                    world.items.push(coinItem);
+                    rewardCount++;
+                }
+                
+                if (reward.itemReward) {
+                    const newItem = new Item();
+                    newItem.setupAtLocation(x, y);
+                    newItem.isCoin = false;
+                    newItem.isWeapon = false;
+                    newItem.isHealing = false;
+                    newItem.health = 0;
+                    newItem.maxHealth = 0;
+                    newItem.minAttackPower = 0;
+                    newItem.maxAttackPower = 0;
+                    
+                    if (reward.itemReward.isWeapon) {
+                        newItem.isWeapon = true;
+                        newItem.minAttackPower = reward.itemReward.minAttackPower;
+                        newItem.maxAttackPower = reward.itemReward.maxAttackPower;
+                        newItem.name = 'Оружие';
+                    } else {
+                        newItem.isHealing = true;
+                        newItem.health = reward.itemReward.health;
+                        newItem.maxHealth = reward.itemReward.maxHealth;
+                        newItem.name = 'Зелье';
+                    }
+                    
+                    world.items.push(newItem);
+                    rewardCount++;
+                }
+                
+                if (rewardCount > 0) {
+                    message += `Вы помогли ${questGiverFound.name}! ${STAT_EMOJI.COINS} Вам выпала награда!\n`;
+                } else {
+                    message += `Вы помогли ${questGiverFound.name}, но не получили награды.\n`;
+                }
+                
+                questGiverFound.questCompleted = true;
+                updatePlayerStats(session, { questCompleted: true });
+                updateGlobalStats({ questCompleted: true });
+            } else {
+                message += `Вы попытались помочь ${questGiverFound.name}, но ему что-то не понравилось!\n`;
+                message += `${questGiverFound.name} разозлился и напал на вас!\n`;
+                questGiverFound.agressive = true;
+                questGiverFound.questCompleted = true;
+                
+                const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, x, y);
+                message += npcAttackResult.text;
+                
+                if (npcAttackResult.stats.playerDied) {
+                    playerDied = true;
+                    updateGlobalStats({ gameCompleted: true, death: true });
+                    updatePlayerStats(session, { gameCompleted: true, death: true });
+                    message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+                }
+            }
+        }
+
+        if (!playerDied) {
+            message += player.getPlayerDescription() + '\n';
+            message +=
+                '\n' +
+                world.GetLocationText(x, y) +
+                player.getLocationCoords() +
+                world.printWorldMap(x, y);
+        }
+
+        const buttons = playerDied
             ? generateDeathButtons()
             : generateInlineButtons(
                 world.getAvailableDirections(x, y),
                 world.getAvailableActions(x, y)
             );
+
+        if (query.message) {
+            bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+                chat_id: currentChatID,
+                message_id: query.message.message_id,
+            });
+        }
+
+        bot.sendMessage(currentChatID, message, buttons);
+    }
+
+    // ============ PORTAL ===============
+    if (action === 'portal') {
+        message = '';
+        x = player.getX();
+        y = player.getY();
+
+        const portal = world.getPortalAtLocation(x, y);
+
+        if (!portal) {
+            message += 'Здесь нет портала.\n';
+        } else {
+            updatePlayerStats(session, { portalUsed: true });
+            updateGlobalStats({ portalUsed: true });
+            
+            if (portal.isWorldPortal) {
+                message += `${STAT_EMOJI.PORTAL} Вы вошли в портал...\n\n`;
+
+                const width = session.mode === 'pc' ? WORLD_PC_WIDTH : WORLD_MOBILE_WIDTH;
+                const height = session.mode === 'pc' ? WORLD_PC_HEIGHT : WORLD_MOBILE_HEIGHT;
+
+                world.setup(width, height);
+                world.generate();
+                player.setup(width, height, player.name);
+                player.clearAttributes();
+                player.setRandomLocation();
+
+                const nx = player.getX();
+                const ny = player.getY();
+                world.generateNPC(nx, ny);
+                world.generateMerchant(nx, ny);
+                world.generateQuestGiver(nx, ny);
+                world.generateItems(nx, ny);
+                world.generatePortals(nx, ny);
+                player.markCellVisited(nx, ny);
+
+                world.recalculateNPCsForLevel(player.heroLevel);
+
+                message += `Вы прибыли в новый мир: *${world.worldName}*\n\n`;
+
+                const locationMessage =
+                    world.GetLocationText(nx, ny) +
+                    player.getLocationCoords() +
+                    world.printWorldMap(nx, ny);
+                message += locationMessage;
+
+                updateGlobalStats({ worldChange: true });
+            } else {
+                let newX, newY;
+                do {
+                    newX = Math.floor(Math.random() * world.width);
+                    newY = Math.floor(Math.random() * world.height);
+                } while (newX === x && newY === y);
+
+                player.setPosition(newX, newY);
+                message += `${STAT_EMOJI.PORTAL} Вы зашли в портал и телепортировались в случайную точку мира!\n\n`;
+                
+                const xpForNextLevel = player.getXPToNextLevel();
+                const xpReward = Math.floor(xpForNextLevel / 2);
+                const expResult = player.addExperienceForAction(xpReward);
+                message += `✨ Получено опыта: +${xpReward}\n`;
+                if (expResult.leveledUp && expResult.statsGained) {
+                    message += `\n${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
+                    message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
+                    message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
+                }
+                message += '\n';
+
+                const locationMessage =
+                    world.GetLocationText(newX, newY) +
+                    player.getLocationCoords() +
+                    world.printWorldMap(newX, newY);
+                message += locationMessage;
+            }
+        }
+
+        message += player.getPlayerDescription() + '\n';
+
+        const buttons = generateInlineButtons(
+            world.getAvailableDirections(player.getX(), player.getY()),
+            world.getAvailableActions(player.getX(), player.getY())
+        );
 
         if (query.message) {
             bot.editMessageReplyMarkup({ inline_keyboard: [] }, {

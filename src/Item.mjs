@@ -1,7 +1,9 @@
-import { AdjectiveWords } from './AdjectiveWords.mjs';
-import { DEBUG_ITEMS_CREATION } from './GameDebug.mjs';
-import { STAT_TEXT_LABELS } from './StatTextLabels.mjs';
-import { STAT_EMOJI } from './SmileInText.mjs';
+import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
+import { STAT_TEXT_LABELS } from './TextEnums/StatTextLabels.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
+import { WeaponNames } from './TextEnums/WeaponNames.mjs';
+import { HealItemNames } from './TextEnums/HealItemNames.mjs';
+import { DEBUG_ITEMS_CREATION, ITEM_SETTINGS, ITEM_TEXT } from './GameSetup.mjs';
 
 export class Item {
     constructor() {
@@ -16,7 +18,6 @@ export class Item {
         this.name = '';
     }
 
-    // Генерация предмета в случайной позиции мира
     setup(worldWidth, worldHeight, excludeX, excludeY) {
         this.x = Math.floor(Math.random() * worldWidth);
         this.y = Math.floor(Math.random() * worldHeight);
@@ -32,16 +33,17 @@ export class Item {
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             
+            const { WEAPON_MIN_DAMAGE, WEAPON_MAX_DAMAGE } = ITEM_SETTINGS.WORLD_ITEM;
             const damageType = Math.floor(Math.random() * 3);
             if (damageType === 0) {
-                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
+                this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
                 this.maxAttackPower = 0;
             } else if (damageType === 1) {
                 this.minAttackPower = 0;
-                this.maxAttackPower = 1 + Math.floor(Math.random() * 20);
+                this.maxAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE * 2);
             } else {
-                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
-                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * 10);
+                this.minAttackPower = WEAPON_MIN_DAMAGE + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
+                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * WEAPON_MAX_DAMAGE);
             }
         } else {
             this.isHealing = true;
@@ -49,25 +51,19 @@ export class Item {
             const baseNames = Object.values(HealItemNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             if (Math.random() > 0.3) {
-                this.health = 1 + Math.floor(Math.random() * 50);
+                const { HEALING_MIN, HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+                this.health = HEALING_MIN + Math.floor(Math.random() * HEALING_MAX);
             } else {
-                this.maxHealth = Math.floor(Math.random() * 50);
+                const { MAX_HEALING_MIN, MAX_HEALING_MAX } = ITEM_SETTINGS.WORLD_ITEM;
+                this.maxHealth = MAX_HEALING_MIN + Math.floor(Math.random() * MAX_HEALING_MAX);
             }
         }
 
         if (DEBUG_ITEMS_CREATION) {
-            console.log(
-                'Created Item:',
-                this.name,
-                ' at ',
-                this.x,
-                '/',
-                this.y
-            );
+            console.log('Created Item:', this.name, ' at ', this.x, '/', this.y);
         }
     }
 
-    // Создание предмета в конкретной позиции (после убийства монстра)
     setupAtLocation(a, b) {
         this.x = a;
         this.y = b;
@@ -75,8 +71,18 @@ export class Item {
         const coinChance = Math.random();
         if (coinChance < 0.3) {
             this.isCoin = true;
-            this.coins = 1 + Math.floor(Math.random() * 10);
-            this.name = 'Монета' + (this.coins > 1 ? 'ы' : '');
+            const { MIN, MAX } = ITEM_SETTINGS.COINS;
+            this.coins = MIN + Math.floor(Math.random() * MAX);
+            
+            const lastDigit = this.coins % 10;
+            const lastTwoDigits = this.coins % 100;
+            if (lastDigit === 1 && lastTwoDigits !== 11) {
+                this.name = ITEM_TEXT.COIN_NAMES.ONE;
+            } else if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
+                this.name = ITEM_TEXT.COIN_NAMES.FEW;
+            } else {
+                this.name = ITEM_TEXT.COIN_NAMES.MANY;
+            }
             return;
         }
 
@@ -86,16 +92,17 @@ export class Item {
             const baseNames = Object.values(WeaponNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             
+            const { MIN_DAMAGE, MAX_DAMAGE } = ITEM_SETTINGS.WEAPON;
             const damageType = Math.floor(Math.random() * 3);
             if (damageType === 0) {
-                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
+                this.minAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE);
                 this.maxAttackPower = 0;
             } else if (damageType === 1) {
                 this.minAttackPower = 0;
-                this.maxAttackPower = 1 + Math.floor(Math.random() * 20);
+                this.maxAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE * 2);
             } else {
-                this.minAttackPower = 1 + Math.floor(Math.random() * 10);
-                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * 10);
+                this.minAttackPower = MIN_DAMAGE + Math.floor(Math.random() * MAX_DAMAGE);
+                this.maxAttackPower = this.minAttackPower + Math.floor(Math.random() * MAX_DAMAGE);
             }
         } else {
             this.isHealing = true;
@@ -103,9 +110,11 @@ export class Item {
             const baseNames = Object.values(HealItemNames);
             this.name = baseNames[Math.floor(Math.random() * baseNames.length)];
             if (Math.random() > 0.5) {
-                this.health = 1 + Math.floor(Math.random() * 20);
+                const { HEALTH_MIN, HEALTH_MAX } = ITEM_SETTINGS.HEALING;
+                this.health = HEALTH_MIN + Math.floor(Math.random() * HEALTH_MAX);
             } else {
-                this.maxHealth = 1 + Math.floor(Math.random() * 30);
+                const { MAX_HEALTH_MIN, MAX_HEALTH_MAX } = ITEM_SETTINGS.HEALING;
+                this.maxHealth = MAX_HEALTH_MIN + Math.floor(Math.random() * MAX_HEALTH_MAX);
             }
         }
 
@@ -114,221 +123,26 @@ export class Item {
         }
     }
 
-    // Получение описания предмета для отображения
-    // Получение описания предмета для отображения
     getItemDescription() {
-        let descriptionString = '';
-        descriptionString += '- ' + this.name + ' ';
+        let descriptionString = ITEM_TEXT.PREFIX + this.name + ITEM_TEXT.SEPARATOR;
         if (this.isCoin) {
-            descriptionString += STAT_EMOJI.COINS + ' ' + this.coins + '\n';
+            descriptionString += STAT_EMOJI.COINS + ' ' + this.coins;
         } else if (this.isHealing) {
             const parts = [];
             if (this.health)
                 parts.push('+' + this.health + ' ' + STAT_TEXT_LABELS.health);
             if (this.maxHealth)
                 parts.push('+' + this.maxHealth + ' ' + STAT_TEXT_LABELS.maxHealth);
-            descriptionString += STAT_EMOJI.HEALTH + ' ' + (parts.length ? parts.join(', ') : '+0');
+            descriptionString += STAT_EMOJI.HEALTH + ' ' + (parts.length ? parts.join(', ') : ITEM_TEXT.NO_BONUS);
         } else {
             const parts = [];
             if (this.minAttackPower)
                 parts.push('+' + this.minAttackPower + ' ' + STAT_TEXT_LABELS.minDamage);
             if (this.maxAttackPower)
                 parts.push('+' + this.maxAttackPower + ' ' + STAT_TEXT_LABELS.maxDamage);
-            descriptionString += STAT_EMOJI.ATTACK + ' ' + (parts.length ? parts.join(', ') : '+0');
+            descriptionString += STAT_EMOJI.ATTACK + ' ' + (parts.length ? parts.join(', ') : ITEM_TEXT.NO_BONUS);
         }
         descriptionString += '\n';
         return descriptionString;
     }
 }
-
-const WeaponNames = Object.freeze({
-    // Легендарные мечи
-    EXCALIBUR: 'Эскалибур',
-    DRAGON_SLAYER: 'Убийца драконов',
-    FROSTBANE: 'Морозная погибель',
-    SOLAR_EDGE: 'Солнечная грань',
-    VOID_REAPER: 'Жнец Бездны',
-
-    // Топоры и секиры
-    SKULL_SPLITTER: 'Раскалыватель черепов',
-    THUNDER_MAUL: 'Громовой молот',
-    DWARVEN_RAMPAGE: 'Ярость гномов',
-    MOUNTAIN_CLEAVER: 'Рассекатель гор',
-    BERSERKER_FURY: 'Ярость берсерка',
-
-    // Луки и арбалеты
-    WINDRUNNER: 'Повелитель ветра',
-    PHANTOM_ARCHER: 'Призрачный лучник',
-    STARSEEKER: 'Искатель звезд',
-    VIPER_STING: 'Жало гадюки',
-    SOLAR_FLARE: 'Солнечная вспышка',
-
-    // Магические посохи
-    ARCANE_FOCUS: 'Фокус Арканы',
-    INFINITY_ROD: 'Жезл Бесконечности',
-    ABYSSAL_WHISPER: 'Шепот Бездны',
-    ELEMENTAL_CONDUIT: 'Проводник Стихий',
-    MOONWEAVER: 'Ткач Лунного Света',
-
-    // Кинжалы и когти
-    SHADOW_FANG: 'Теневой Клык',
-    VENOMTOOTH: 'Ядовитый Зуб',
-    ASSASSINS_SILENCE: 'Тишина Убийцы',
-    PHANTOM_CLAW: 'Призрачный Коготь',
-    SOUL_SHANKER: 'Пронзатель Душ',
-
-    // Экзотическое оружие
-    VOID_TALON: 'Коготь Пустоты',
-    CHRONOMANCER_BLADE: 'Клинок Хрономанта',
-    DREAMCATCHER_SCYTHE: 'Коса Ловца Снов',
-    CELESTIAL_ORB: 'Небесная Сфера',
-    PSIONIC_GAUNTLET: 'Псионическая Перчатка',
-
-    // Оружие стихий
-    INFERNO_BLADE: 'Клинок Инферно',
-    TIDAL_TRIDENT: 'Трезубец Приливов',
-    TEMPEST_AXE: 'Топор Бури',
-    TERRA_MACE: 'Булава Земли',
-    AETHER_WAND: 'Жезл Эфира',
-
-    // Древние реликвии
-    PHARAOH_SCEPTER: 'Скипетр Фараона',
-    RUNIC_MONOLITH: 'Рунический Монолит',
-    OLYMPIAN_SPEAR: 'Копье Олимпа',
-    VALHALLAS_CHOSEN: 'Избранный Вальхаллы',
-    ATLANTEAN_GLAIVE: 'Глефа Атлантиды',
-
-    // Орковое оружие
-    BLOODSKULL_MAUL: 'Молот Кровавого Черепа',
-    IRONHIDE_CLEAVER: 'Секира Железной Кожи',
-    WARLORD_DESPOILER: 'Разоритель Вождей',
-    GRONN_TUSK: 'Клык Гронна',
-    FEL_IRON_REAPER: 'Жнец Скверножелеза',
-
-    // Эльфийское оружие
-    SILVERWOOD_BOW: 'Лук Серебряного Леса',
-    LUNAR_WHISPER: 'Лунный Шепот',
-    ANCIENT_GUARDIAN: 'Древний Страж',
-    STARFALL_ARROW: 'Стрела Звездопада',
-    DRYADS_EMBRACE: 'Объятия Дриады',
-
-    // Оружие нежити
-    BONE_CARVER: 'Резчик Костей',
-    SOULDRINKER: 'Пьющая Души',
-    GRAVEDIGGER: 'Могильный Копатель',
-    NECROTIC_SCYTHE: 'Некротическая Коса',
-    WITHERED_BRANCH: 'Увядшая Ветвь',
-
-    // Драконье оружие
-    WYRMBONE_GREATSWORD: 'Двуручник из Кости Дракона',
-    SCALEBANE_SPEAR: 'Копье Чешуеборца',
-    EMBERCLAW: 'Огненный Коготь',
-    FROSTWYRM_FANG: 'Клык Ледяного Змея',
-    DRACONIC_VOLLEY: 'Драконий Залп',
-
-    // Божественное оружие
-    SERAPHIM_BLADE: 'Клинок Серафима',
-    DIVINE_RETRIBUTION: 'Божественная Расплата',
-    HOLY_AVENGER: 'Святой Мститель',
-    PURITY_STAFF: 'Посох Чистоты',
-    ARCHANGELS_WRATH: 'Гнев Архангела',
-
-    // Хаотичное оружие
-    DEMONFORGE_HAMMER: 'Молот Демонской Кузни',
-    CHAOS_BLADE: 'Клинок Хаоса',
-    ABYSSAL_SHARD: 'Осколок Бездны',
-    INFERNAL_WHIP: 'Адский Кнут',
-    VOIDCALLER: 'Призыватель Бездны',
-
-    // Техномагическое
-    COGSAW: 'Зубчатый Резак',
-    STEAM_PISTON_MACE: 'Паровой Молот',
-    ARCANE_CORE_RIFLE: 'Винтовка с Магическим Ядром',
-    CRYSTAL_RESONATOR: 'Кристальный Резонатор',
-    GEARBLADE: 'Шестеренчатый Клинок',
-
-    // Природное оружие
-    THORNED_VINE: 'Шипастая Лоза',
-    PETRIFIED_ROOT: 'Окаменевший Корень',
-    WHISPERING_OAK: 'Шепчущий Дуб',
-    STONEBARK_CUDGEL: 'Дубина Каменной Коры',
-    WILDFIRE_STAFF: 'Посох Дикого Огня',
-
-    // Критические названия
-    HEARTSEEKER: 'Искатель Сердец',
-    MINDREAVER: 'Разрушитель Разума',
-    NIGHTMARE_BRINGER: 'Приносящий Кошмары',
-    SOULBINDER: 'Повелитель Душ',
-    DOOMBRINGER: 'Вестник Рока',
-
-    // Ироничные названия
-    GOBLIN_POKER: 'Гоблинье Тыкало',
-    TROLL_DENTIST: 'Зубодер Троллей',
-    MINNOW_SLAPPER: 'Шлепатель Пескарей',
-    WIZARDS_MISTAKE: 'Ошибка Волшебника',
-    ORC_TOOTHPICK: 'Зубочистка Орка',
-
-    // Поэтичные названия
-    DAWNS_FIRST_LIGHT: 'Первый Свет Зари',
-    EVENING_STAR: 'Вечерняя Звезда',
-    OCEANS_DEPTH: 'Глубина Океана',
-    MOUNTAINS_SOUL: 'Душа Горы',
-    FORESTS_BREATH: 'Дыхание Леса',
-
-    // Мистические артефакты
-    RUNEBOUND_RELIC: 'Руническая Реликвия',
-    VEILWALKER: 'Ходящий по Завесе',
-    ECHOES_OF_MADNESS: 'Эхо Безумия',
-    PRIMORDIAL_SHARD: 'Первозданный Осколок',
-    INFINITE_PARADOX: 'Бесконечный Парадокс',
-});
-
-const HealItemNames = Object.freeze({
-    // Базовые зелья
-    MINOR_HEALING_POTION: 'Слабое зелье лечения',
-    HEALING_POTION: 'Зелье лечения',
-    GREATER_HEALING_POTION: 'Сильное зелье лечения',
-    MAJOR_HEALING_POTION: 'Великое зелье лечения',
-
-    // Природные средства
-    HEALING_HERBS: 'Целебные травы',
-    EMBERROOT: 'Огненный корень',
-    MOONPETAL_SALVE: 'Мазь из лунных лепестков',
-    SUN_BERRIES: 'Солнечные ягоды',
-    FOREST_BALM: 'Лесной бальзам',
-
-    // Священные исцеления
-    HOLY_WATER: 'Святая вода',
-    ANGEL_TEARS: 'Слезы ангела',
-    BLESSED_BANDAGE: 'Благословенная повязка',
-    DIVINE_AMBROSIA: 'Божественная амброзия',
-    PURIFYING_CRYSTAL: 'Очищающий кристалл',
-
-    // Магические эссенции
-    PHOENIX_ESSENCE: 'Эссенция феникса',
-    LIFE_ESSENCE: 'Эссенция жизни',
-    ARCANE_SALVE: 'Чародейская мазь',
-    MANA_INFUSED_BREW: 'Настой маны',
-    RESURRECTION_ELIXIR: 'Эликсир воскрешения',
-
-    // Необычные предметы
-    VAMPIRE_VENOM_ANTIDOTE: 'Антидот вампирского яда',
-    REGENERATIVE_MOSS: 'Регенеративный мох',
-    DWARVEN_STONEBREW: 'Гномий каменный напиток',
-    ELIXIR_OF_VITALITY: 'Эликсир жизненной силы',
-    FAERIE_DUST: 'Пыльца фей',
-
-    // Еда и напитки
-    HEARTY_STEW: 'Сытное рагу',
-    GOLDEN_APPLE: 'Золотое яблоко',
-    MIGHTY_MEAD: 'Могучий медовух',
-    DRAGON_BLOOD_WINE: 'Вино из драконьей крови',
-    AMBROSIAL_NECTAR: 'Нектар амброзии',
-
-    // Экстренные средства
-    EMERGENCY_BANDAGE: 'Экстренная повязка',
-    SOULSTONE_FRAGMENT: 'Фрагмент камня душ',
-    LAST_RESORT_SYRINGE: 'Шприц последнего шанса',
-    NECROMANCERS_GIFT: 'Дар некроманта',
-    BERSERKER_STIMULANT: 'Стимулятор берсерка',
-});

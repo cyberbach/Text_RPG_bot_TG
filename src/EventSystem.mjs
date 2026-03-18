@@ -1,6 +1,6 @@
 // Система игровых эвентов
 
-import { STAT_EMOJI } from './SmileInText.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 
 export const EVENT_TYPE = Object.freeze({
     WEATHER_SUNNY: 'weather_sunny',

@@ -51,4 +51,7 @@ export const STAT_EMOJI = Object.freeze({
 
     // Игра
     GAME: '🎮',
+
+    // Портал
+    PORTAL: '🌀',
 });

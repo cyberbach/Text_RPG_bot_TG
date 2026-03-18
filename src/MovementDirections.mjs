@@ -3,4 +3,5 @@ export const DIRECTIONS = {
     RIGHT: 'right',
     UP: 'up',
     DOWN: 'down',
+    PORTAL: 'portal',
 };

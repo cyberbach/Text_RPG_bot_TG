@@ -1,6 +1,17 @@
-import { DIRECTIONS } from './MovementDirections.mjs';
-import { Item } from './Item.mjs';
-import { STAT_EMOJI } from './SmileInText.mjs';
+import { AdjectiveWords } from './TextEnums/AdjectiveWords.mjs';
+import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
+import { PLAYER_SETTINGS } from './GameSetup.mjs';
+
+const PLAYER_TEXT = {
+    PICKED_COINS: 'Вы подобрали ',
+    PICKED_ITEM: 'Вы подобрали ',
+    COINS_SUFFIX: ' монет\n',
+    ITEM_SUFFIX: '\n',
+    LEVEL_PREFIX: ' (ур. ',
+    LEVEL_SUFFIX: ')',
+    DIVIDER: ' / ',
+    NO_BONUS: '+0',
+};
 
 export class Player {
     constructor() {}
@@ -14,17 +25,19 @@ export class Player {
 
     // Сброс атрибутов при старте новой игры
     clearAttributes() {
-        this.maxHealth = 100;
-        this.maxArmor = 100;
-        this.minAttackPower = 1;
-        this.maxAttackPower = 10;
+        const { BASE_MAX_HEALTH, BASE_MAX_ARMOR, BASE_MIN_ATTACK, BASE_MAX_ATTACK, BASE_ARMOR, BASE_HIT_CHANCE, HIT_CHANCE_BONUS_PER_LEVEL } = PLAYER_SETTINGS;
+        
+        this.maxHealth = BASE_MAX_HEALTH;
+        this.maxArmor = BASE_MAX_ARMOR;
+        this.minAttackPower = BASE_MIN_ATTACK;
+        this.maxAttackPower = BASE_MAX_ATTACK;
         this.health = this.maxHealth;
-        this.armor = 0;
+        this.armor = BASE_ARMOR;
         this.experience = 0;
         this.heroLevel = 1;
         this.coins = 0;
-        this.hitChanceBase = 50; // Базовый шанс попадания (%)
-        this.hitChanceBonusPerLevel = 2; // Бонус к шансу за каждый уровень (%)
+        this.hitChanceBase = BASE_HIT_CHANCE;
+        this.hitChanceBonusPerLevel = HIT_CHANCE_BONUS_PER_LEVEL;
         this.visitedCells = new Set();
     }
 
@@ -35,9 +48,12 @@ export class Player {
 
     // Использование/подбор предмета
     useItem(inItem) {
+        let coinsGained = 0;
+        
         if (inItem.isCoin) {
             this.coins += inItem.coins;
-            return 'Вы подобрали ' + inItem.coins + ' монет\n';
+            coinsGained = inItem.coins;
+            return { text: PLAYER_TEXT.PICKED_COINS + inItem.coins + PLAYER_TEXT.COINS_SUFFIX, coinsGained };
         }
         if (inItem.isWeapon) {
             this.minAttackPower += inItem.minAttackPower;
@@ -51,15 +67,13 @@ export class Player {
             this.modifyHealth(inItem.health);
         }
 
-        return 'Вы использовали ' + inItem.name + '\n';
+        return { text: PLAYER_TEXT.PICKED_ITEM + inItem.name + PLAYER_TEXT.ITEM_SUFFIX, coinsGained };
     }
 
     // Расчет требуемого опыта для уровня (статический метод)
     static getXPRequiredForLevel(level) {
-        // Level 1 starts at 0 XP.
-        // Level 2: 100 XP, Level 3: 250 XP, ... increments are 50 * nextLevel.
         if (level <= 1) return 0;
-        return 50 * ((level * (level + 1)) / 2 - 1);
+        return PLAYER_SETTINGS.XP_BASE_MULTIPLIER * ((level * (level + 1)) / 2 - 1);
     }
 
     // Получение опыта для следующего уровня
@@ -78,23 +92,19 @@ export class Player {
         let statsGained = null;
 
         while (this.experience >= this.getXPToNextLevel()) {
-            const oldMaxHealth = this.maxHealth;
-            const oldMinAttack = this.minAttackPower;
-            const oldMaxAttack = this.maxAttackPower;
-            
+            const hpBonus = (this.heroLevel - 1) * PLAYER_SETTINGS.HEALTH_BONUS_PER_LEVEL;
             this.heroLevel += 1;
             leveledUp = true;
 
-            const hpBonus = (this.heroLevel - 1) * 10;
             this.maxHealth += hpBonus;
             this.health = this.maxHealth;
-            this.minAttackPower += 1;
-            this.maxAttackPower += 2;
+            this.minAttackPower += PLAYER_SETTINGS.ATTACK_BONUS_PER_LEVEL.MIN;
+            this.maxAttackPower += PLAYER_SETTINGS.ATTACK_BONUS_PER_LEVEL.MAX;
 
             statsGained = {
                 hpBonus,
-                minAttackBonus: 1,
-                maxAttackBonus: 2,
+                minAttackBonus: PLAYER_SETTINGS.ATTACK_BONUS_PER_LEVEL.MIN,
+                maxAttackBonus: PLAYER_SETTINGS.ATTACK_BONUS_PER_LEVEL.MAX,
                 newLevel: this.heroLevel
             };
         }
@@ -104,7 +114,6 @@ export class Player {
 
     // Добавление опыта за действие (с учетом уровня)
     addExperienceForAction(baseAmount) {
-        // Scale XP gain with current level.
         return this.addExperience(baseAmount * this.heroLevel);
     }
 
@@ -123,18 +132,19 @@ export class Player {
         this.y = Math.floor(Math.random() * this.maxHeight);
     }
 
+    // Установка позиции на карте
+    setPosition(newX, newY) {
+        this.x = newX;
+        this.y = newY;
+    }
+
     // Получение описания игрока (для отображения в сообщении)
     getPlayerDescription() {
         if (this.health > 0) {
-            const healthString = ' ' + STAT_EMOJI.HEALTH + ' ' + this.health + ' / ' + this.maxHealth;
-            const attackString =
-                ' ' + STAT_EMOJI.ATTACK + ' ' +
-                this.minAttackPower +
-                '..' +
-                this.maxAttackPower;
+            const healthString = PLAYER_TEXT.DIVIDER + STAT_EMOJI.HEALTH + ' ' + this.health + PLAYER_TEXT.DIVIDER + this.maxHealth;
+            const attackString = STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
             const xpNext = this.getXPToNextLevel();
-            const xpString =
-                ' ' + STAT_EMOJI.EXPERIENCE + ' ' + this.experience + ' / ' + xpNext + ' (ур. ' + this.heroLevel + ')';
+            const xpString = STAT_EMOJI.EXPERIENCE + ' ' + this.experience + PLAYER_TEXT.DIVIDER + xpNext + PLAYER_TEXT.LEVEL_PREFIX + this.heroLevel + PLAYER_TEXT.LEVEL_SUFFIX;
             const coinsString = this.coins > 0 ? ' ' + STAT_EMOJI.COINS + ' ' + this.coins : '';
             return STAT_EMOJI.LEVEL + ' ' + this.name + xpString + healthString + attackString + coinsString + '\n';
         } else {
@@ -145,10 +155,7 @@ export class Player {
     // Изменение здоровья (положительное - лечение, отрицательное - урон)
     modifyHealth(amount) {
         this.health += amount;
-
-        //clamp from 0 to maxHealth
         this.health = Math.min(Math.max(this.health, 0), this.maxHealth);
-
         return this.health > 0;
     }
 
@@ -180,31 +187,30 @@ export class Player {
     // Перемещение игрока в направлении
     move(direction) {
         switch (direction) {
-            case DIRECTIONS.UP:
+            case 'up':
                 if (this.y > 0) {
                     this.y--;
                     return true;
                 }
                 break;
-            case DIRECTIONS.DOWN:
+            case 'down':
                 if (this.y < this.maxHeight - 1) {
                     this.y++;
                     return true;
                 }
                 break;
-            case DIRECTIONS.LEFT:
+            case 'left':
                 if (this.x > 0) {
                     this.x--;
                     return true;
                 }
                 break;
-            case DIRECTIONS.RIGHT:
+            case 'right':
                 if (this.x < this.maxWidth - 1) {
                     this.x++;
                     return true;
                 }
                 break;
-
             default:
                 break;
         }
