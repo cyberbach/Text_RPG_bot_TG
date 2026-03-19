@@ -49,7 +49,7 @@ export function handleBuy(params) {
         '\n' +
         world.GetLocationText(x, y, player) +
         player.getLocationCoords() +
-        world.printWorldMap(x, y);
+        world.printWorldMap(x, y, player);
 
     const { generateInlineButtons } = params;
     const buttons = generateInlineButtons(
@@ -145,7 +145,7 @@ export function handleHelp(params) {
         } else {
             message += `Вы попытались помочь ${questGiverFound.name}, но ему что-то не понравилось!\n`;
             message += `${questGiverFound.name} разозлился и напал на вас!\n`;
-            questGiverFound.agressive = true;
+            questGiverFound.becomeAggressive();
             questGiverFound.questCompleted = true;
             
             const npcAttackResult = allAgressiveNPCAttackPlayer(world, player, x, y);
@@ -165,7 +165,7 @@ export function handleHelp(params) {
         message +=
             world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
-            world.printWorldMap(x, y);
+            world.printWorldMap(x, y, player);
     }
 
     const buttons = playerDied

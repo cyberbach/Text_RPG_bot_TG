@@ -6,11 +6,12 @@ export const LOCATION_TYPE = {
     DESERT: 'DESERT',
     UNDERCAVE: 'UNDERCAVE',
     RIVER: 'RIVER',
-    GLADE: 'GLADE', // Поляна
-    MEADOW: 'MEADOW', // Луг
-    THICKETS: 'THICKETS', // Заросли
-    ZROAD: 'ZROAD', // Дорога
-    CITY: 'CITY', // Город
+    LAKE: 'LAKE',
+    GLADE: 'GLADE',
+    MEADOW: 'MEADOW',
+    THICKETS: 'THICKETS',
+    ZROAD: 'ZROAD',
+    CITY: 'CITY',
 };
 
 export { LOCATION_DESCRIPTIONS };
@@ -54,6 +55,9 @@ export function locationIDToRussian(id) {
             break;
         case 'RIVER':
             russianNameFromID = '🌊 Река 🚣';
+            break;
+        case 'LAKE':
+            russianNameFromID = '💧 Озеро 🐟';
             break;
         case 'GLADE':
             russianNameFromID = '☀️🌸 Поляна 🦋🍀';

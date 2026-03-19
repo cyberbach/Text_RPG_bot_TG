@@ -2,9 +2,8 @@ import { allAgressiveNPCAttackPlayer, playerAttackNPC, lightningStrike } from '.
 
 /**
  * Обработка атаки игрока (attack)
- * - Сначала атакуют агрессивные NPC (если игрок погибает - конец игры)
- * - Затем атакует игрок (убивает всех NPC на локации)
- * - Если все NPC убиты - начисляется XP (5 * количество убитых)
+ * - Игрок атакует первым, XP добавляется сразу при убийстве
+ * - Затем атакуют агрессивные NPC
  * - Показывает оставшихся NPC или новую локацию с картой
  */
 export function handleCombat(params) {
@@ -13,14 +12,16 @@ export function handleCombat(params) {
     let message = '';
     const x = player.getX();
     const y = player.getY();
-
+    
     let playerAttackResult, npcAttackResult;
     
+    playerAttackResult = playerAttackNPC(world, player);
+    message += playerAttackResult.text;
+    
     npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
+    message += npcAttackResult.text;
     
     if (npcAttackResult.stats.playerDied) {
-        message += npcAttackResult.text;
-        
         updateGlobalStats({ damageTaken: npcAttackResult.stats.damageTaken });
         updateGlobalStats({ gameCompleted: true, death: true });
         updatePlayerStats(session, { damageTaken: npcAttackResult.stats.damageTaken });
@@ -39,9 +40,6 @@ export function handleCombat(params) {
         
         return { message, buttons, removeKeyboard: true, editOnly: true };
     }
-    
-    playerAttackResult = playerAttackNPC(world, player);
-    message += npcAttackResult.text + playerAttackResult.text;
 
     updateGlobalStats({
         damageDealt: playerAttackResult.stats.damageDealt,
@@ -78,21 +76,13 @@ export function handleCombat(params) {
         session.combatState = false;
         
         if (playerAttackResult.stats.monstersKilled > 0) {
-            const xpGained = playerAttackResult.stats.monstersKilled * 5;
-            const expResult = player.addExperienceForAction(xpGained);
-            message += `✨ Опыт за убитых врагов: +${expResult.gained}\n`;
-            if (expResult.leveledUp && expResult.statsGained) {
-                message += `\n${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-                message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-                message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
-            }
             updateGlobalStats({ monsterKilled: true, heroLevel: player.heroLevel });
             updatePlayerStats(session, { monsterKilled: true, heroLevel: player.heroLevel });
         }
         
         message += '\n' +
             world.GetLocationText(x, y, player) +
-            world.printWorldMap(x, y);
+            world.printWorldMap(x, y, player);
     } else {
         message += world.getNPCsText(x, y);
         message += player.getPlayerDescription() + '\n';

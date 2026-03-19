@@ -7,7 +7,7 @@ import { WorldGenerator } from './src/World.mjs';
 import { Player } from './src/Player.mjs';
 import { Item } from './src/Item.mjs';
 import { initEvent } from './src/EventSystem.mjs';
-import { PORTAL_SETTINGS, DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_LOG_SPAWN } from './src/GameSetup.mjs';
+import { PORTAL_SETTINGS, DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_LOG_SPAWN, PLAYER_SETTINGS } from './src/GameSetup.mjs';
 import { NPC_TYPE } from './src/NPC.mjs';
 import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
@@ -181,7 +181,9 @@ function setupNewGame(session, options) {
     session.world.generateQuestGiver(x, y);
     session.world.generateItems(x, y);
     session.world.generatePortals(x, y);
+    session.world.generateBoss(x, y);
     session.player.markCellVisited(x, y);
+    session.player.markAreaVisible(x, y, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
 
     if (DEBUG_MERCHANT_QUEST_MASS_SPAWN || DEBUG_LOG_SPAWN) {
         const npcs = session.world.npcs;
@@ -189,11 +191,15 @@ function setupNewGame(session, options) {
         const questGivers = npcs.filter(n => n.npcType === NPC_TYPE.QUEST_GIVER);
         const aggressive = npcs.filter(n => n.npcType === NPC_TYPE.AGGRESSIVE);
         const neutral = npcs.filter(n => n.npcType === NPC_TYPE.NEUTRAL);
+        const bosses = npcs.filter(n => n.npcType === NPC_TYPE.BOSS);
 
         console.log(`[DEBUG] === WORLD SPAWN STATS ===`);
         console.log(`[DEBUG] NPCs: ${npcs.length}`);
         console.log(`[DEBUG]   Aggressive: ${aggressive.length}`);
         console.log(`[DEBUG]   Neutral: ${neutral.length + merchants.length + questGivers.length} (Neutral creatures: ${neutral.length}, Merchants: ${merchants.length}, Quest Givers: ${questGivers.length})`);
+        if (bosses.length > 0) {
+            console.log(`[DEBUG]   Bosses: ${bosses.length}`);
+        }
         console.log(`[DEBUG] Portals: ${session.world.portals.length}`);
         console.log(`[DEBUG] Items: ${session.world.items.length}`);
         const weapons = session.world.items.filter(i => i.isWeapon).length;
@@ -238,7 +244,7 @@ bot.onText(/\/start/, (msg) => {
         `сражаться с монстрами и находить сокровища.\n\n` +
         session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
-        session.world.printWorldMap(x, y);
+        session.world.printWorldMap(x, y, session.player);
 
     bot.sendMessage(msg.chat.id, message, buttons);
 });
@@ -267,7 +273,7 @@ bot.onText(/\/pc/, (msg) => {
         `сражаться с монстрами и находить сокровища.\n\n` +
         session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
-        session.world.printWorldMap(x, y);
+        session.world.printWorldMap(x, y, session.player);
 
     bot.sendMessage(msg.chat.id, message, buttons);
 });
@@ -302,7 +308,7 @@ bot.onText(/\/help/, (msg) => {
         `сражаться с монстрами и находить сокровища.\n\n` +
         session.world.GetLocationText(x, y, session.player) +
         session.player.getLocationCoords() +
-        session.world.printWorldMap(x, y);
+        session.world.printWorldMap(x, y, session.player);
 
     bot.sendMessage(msg.chat.id, message, buttons);
 });
@@ -382,7 +388,7 @@ bot.on('callback_query', (query) => {
             `${STAT_EMOJI.ATTACK} Новая игра началась! ${STAT_EMOJI.ATTACK}\n\n` +
             session.world.GetLocationText(x, y, session.player) +
             session.player.getLocationCoords() +
-            session.world.printWorldMap(x, y);
+            session.world.printWorldMap(x, y, session.player);
 
         bot.editMessageText(message, {
             chat_id: currentChatID,

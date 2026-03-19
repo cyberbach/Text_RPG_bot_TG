@@ -9,6 +9,7 @@ export const NPC_TYPE = Object.freeze({
     NEUTRAL: 'neutral',
     MERCHANT: 'merchant',
     QUEST_GIVER: 'quest_giver',
+    BOSS: 'boss',
 });
 
 export class NPC {
@@ -60,20 +61,26 @@ export class NPC {
 
     getNpcDescription() {
         const attackString = STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
-        let descriptionString = STAT_EMOJI.MONSTER + ' ' + this.name + ' ';
+        let descriptionString = '';
 
-        if (this.agressive) {
-            descriptionString += STAT_EMOJI.HEALTH + ' ' + this.health + attackString;
-        } else if (this.npcType === NPC_TYPE.MERCHANT && !this.merchantUsed) {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.MERCHANT_ASKING + STAT_EMOJI.COINS + ' ' + this.merchantPrice + NPC_TEXT.MONET_SUFFIX;
-        } else if (this.npcType === NPC_TYPE.QUEST_GIVER && !this.questCompleted) {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.QUEST_NEED_HELP;
-        } else if (this.npcType === NPC_TYPE.QUEST_GIVER && this.questCompleted) {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
-        } else if (this.npcType === NPC_TYPE.MERCHANT && this.merchantUsed) {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+        if (this.npcType === NPC_TYPE.BOSS) {
+            descriptionString = '❤️ ' + this.name + ' (босс) ' + STAT_EMOJI.HEALTH + ' ' + this.health + attackString;
         } else {
-            descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+            descriptionString = STAT_EMOJI.MONSTER + ' ' + this.name + ' ';
+
+            if (this.agressive) {
+                descriptionString += STAT_EMOJI.HEALTH + ' ' + this.health + attackString;
+            } else if (this.npcType === NPC_TYPE.MERCHANT && !this.merchantUsed) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.MERCHANT_ASKING + STAT_EMOJI.COINS + ' ' + this.merchantPrice + NPC_TEXT.MONET_SUFFIX;
+            } else if (this.npcType === NPC_TYPE.QUEST_GIVER && !this.questCompleted) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.QUEST_NEED_HELP;
+            } else if (this.npcType === NPC_TYPE.QUEST_GIVER && this.questCompleted) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+            } else if (this.npcType === NPC_TYPE.MERCHANT && this.merchantUsed) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+            } else {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+            }
         }
         descriptionString += '\n';
 
@@ -87,11 +94,7 @@ export class NPC {
     }
 
     isAggressiveMonster() {
-        return this.npcType === NPC_TYPE.AGGRESSIVE;
-    }
-
-    isAggressive() {
-        return this.agressive && this.npcType !== NPC_TYPE.MERCHANT;
+        return this.agressive || this.npcType === NPC_TYPE.AGGRESSIVE || this.npcType === NPC_TYPE.BOSS;
     }
 
     isMerchant() {
@@ -100,6 +103,15 @@ export class NPC {
 
     isQuestGiver() {
         return this.npcType === NPC_TYPE.QUEST_GIVER && !this.questCompleted;
+    }
+
+    isBoss() {
+        return this.npcType === NPC_TYPE.BOSS;
+    }
+
+    becomeAggressive() {
+        this.agressive = true;
+        this.npcType = NPC_TYPE.AGGRESSIVE;
     }
 
     getQuestReward() {

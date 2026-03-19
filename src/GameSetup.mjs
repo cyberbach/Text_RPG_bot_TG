@@ -80,6 +80,11 @@ export const NPC_SETTINGS = Object.freeze({
     }),
     ATTACK_RANGE: 17,
 
+    // Множители для босса
+    BOSS_HEALTH_MULTIPLIER: 10,
+    BOSS_ATTACK_MULTIPLIER: 3,
+    BOSS_SPAWN_RADIUS: 3,
+
     // Бонус атаки за уровень игрока
     ATTACK_BONUS_PER_LEVEL: Object.freeze({
         MIN: 1,
@@ -130,4 +135,6 @@ export const PLAYER_SETTINGS = Object.freeze({
         MIN: 1,
         MAX: 2,
     }),
+    VISIBILITY_WIDTH: 2,
+    VISIBILITY_HEIGHT: 2,
 });

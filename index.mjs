@@ -2,6 +2,7 @@ import { WorldGenerator } from './src/World.mjs';
 import { Player } from './src/Player.mjs';
 import { DIRECTIONS } from './src/MovementDirections.mjs';
 import { NPC } from './src/NPC.mjs';
+import { PLAYER_SETTINGS } from './src/GameSetup.mjs';
 
 const WORLD_MOBILE_WIDTH = 13; // 13 максимум на телефоне
 const WORLD_MOBILE_HEIGHT = 10;
@@ -17,6 +18,7 @@ world.generate();
 player.setup(WORLD_MOBILE_WIDTH, WORLD_MOBILE_HEIGHT);
 player.clearAttributes();
 player.setRandomLocation();
+player.markAreaVisible(player.getX(), player.getY(), PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
 
 function LocationAbout() {
     const x = player.getX();
@@ -28,7 +30,7 @@ function LocationAbout() {
     console.log('About:', locationDescription);
 }
 
-console.log(world.printWorldMap(player.getX(), player.getY()));
+console.log(world.printWorldMap(player.getX(), player.getY(), player));
 
 LocationAbout();
 player.move(DIRECTIONS.DOWN);

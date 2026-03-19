@@ -6,12 +6,14 @@ import { SPAWN_CHANCES } from './GameSetup.mjs';
 // Атака игроком всех NPC на текущей локации
 export function playerAttackNPC(inWorld, inPlayer) {
     let attackResult = '';
-    let stats = { damageDealt: 0, monstersKilled: 0, coinsGained: 0 };
+    let stats = { damageDealt: 0, monstersKilled: 0, coinsGained: 0, xpGained: 0, leveledUp: false, levelUpStats: null };
     const x = inPlayer.getX();
     const y = inPlayer.getY();
 
     const npcs = inWorld.getNPCsAtLocation(x, y);
     const hitChance = inPlayer.getHitChance(getHitChanceModifier());
+    
+    const npcsToRemove = [];
 
     npcs.forEach((oneNpc) => {
         if (Math.random() * 100 < hitChance) {
@@ -26,19 +28,22 @@ export function playerAttackNPC(inWorld, inPlayer) {
                 oneNpc.name +
                 '\n';
             if (!isAlive) {
-                const indexToRemove = inWorld.npcs.findIndex(
-                    (npc) => npc === oneNpc
-                );
-                inWorld.npcs.splice(indexToRemove, 1);
                 stats.monstersKilled++;
                 attackResult += oneNpc.name + ' ' + STAT_EMOJI.KILL + '\n';
+                
+                const { gained: xpGained } = inPlayer.addExperience(oneNpc.maxAttackPower);
+                stats.xpGained += xpGained;
                 
                 const coinAmount = 1 + Math.floor(Math.random() * 5);
                 inPlayer.coins += coinAmount;
                 stats.coinsGained += coinAmount;
-                attackResult += 'Вы получили ' + coinAmount + ' монет ' + STAT_EMOJI.COINS + '\n';
+                
+                const coinWord = coinAmount === 1 ? 'Монету' : 'Монет';
+                const xpText = xpGained > 0 ? ` и получили ✨ +${xpGained} Опыта` : '';
+                attackResult += `Вы получили ${STAT_EMOJI.COINS} ${coinAmount} ${coinWord}${xpText}\n`;
                 
                 inWorld.generateOneItem(x, y);
+                npcsToRemove.push(oneNpc);
             }
         } else {
             let missText = inPlayer.name + ' промахнулся';
@@ -46,6 +51,13 @@ export function playerAttackNPC(inWorld, inPlayer) {
                 missText += ' (' + getRandomMissReason(getCurrentEvent()) + ')';
             }
             attackResult += missText + '\n';
+        }
+    });
+    
+    npcsToRemove.forEach(npc => {
+        const indexToRemove = inWorld.npcs.findIndex(n => n === npc);
+        if (indexToRemove !== -1) {
+            inWorld.npcs.splice(indexToRemove, 1);
         }
     });
 
@@ -63,7 +75,7 @@ export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY)
 
     const npcs = inWorld.getNPCsAtLocation(x, y);
     npcs.forEach((oneNpc) => {
-        if (isAlive && oneNpc.isAggressive()) {
+        if (isAlive && oneNpc.isAggressiveMonster()) {
             if (Math.random() > 0.5) {
                 const damageAmount =
                     Math.min(oneNpc.minAttackPower, oneNpc.maxAttackPower) +

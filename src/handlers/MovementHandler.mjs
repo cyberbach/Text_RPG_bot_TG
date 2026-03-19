@@ -1,6 +1,7 @@
 import { allAgressiveNPCAttackPlayer } from '../Game.mjs';
 import { DIRECTIONS } from '../MovementDirections.mjs';
 import { tickEventDuration, getCurrentEventName, getHitChanceModifier } from '../EventSystem.mjs';
+import { PLAYER_SETTINGS } from '../GameSetup.mjs';
 
 const DIRECTION_NAMES = {
     'move_up': 'Север',
@@ -57,7 +58,7 @@ export function handleMovement(params) {
         message +=
             world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
-            world.printWorldMap(x, y);
+            world.printWorldMap(x, y, player);
 
         const buttons = generateInlineButtons(
             world.getAvailableDirections(x, y),
@@ -68,7 +69,7 @@ export function handleMovement(params) {
     }
 
     const npcsOnOldLocation = world.getNPCsAtLocation(oldX, oldY);
-    const agressiveNPCsOnOldLocation = npcsOnOldLocation.filter(npc => npc.isAggressive());
+    const agressiveNPCsOnOldLocation = npcsOnOldLocation.filter(npc => npc.isAggressiveMonster());
     
     let isPlayerDied = false;
     
@@ -96,13 +97,15 @@ export function handleMovement(params) {
             world.recalculateNPCsForLevel(player.heroLevel);
             player.markCellVisited(x, y);
         }
+        
+        player.markAreaVisible(x, y, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
 
         const weatherChanged = tickEventDuration();
 
         const locationMessage =
             world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
-            world.printWorldMap(x, y);
+            world.printWorldMap(x, y, player);
         
         let moveMessage = `Вы перешли на ${directionName}`;
         if (weatherChanged) {

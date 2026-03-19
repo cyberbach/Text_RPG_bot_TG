@@ -22,7 +22,7 @@ export function handleItemUse(params) {
             'На локации нет предметов.\n\n' +
             world.GetLocationText(x, y, player) +
             player.getLocationCoords() +
-            world.printWorldMap(x, y);
+            world.printWorldMap(x, y, player);
 
         const buttons = generateInlineButtons(
             world.getAvailableDirections(x, y),
@@ -36,13 +36,6 @@ export function handleItemUse(params) {
     const useResult = player.useItem(oneItemToUse);
     message = useResult.text;
     
-    const expResult = player.addExperienceForAction(1);
-    message += `✨ Опыт: +${expResult.gained}\n`;
-    if (expResult.leveledUp && expResult.statsGained) {
-        message += `${STAT_EMOJI.LEVEL_UP} *ПОВЫШЕНИЕ УРОВНЯ!*\n`;
-        message += `${STAT_EMOJI.HEALTH} Здоровье увеличено на ${expResult.statsGained.hpBonus}\n`;
-        message += `${STAT_EMOJI.ATTACK} Атака увеличена на ${expResult.statsGained.minAttackBonus}\n`;
-    }
     message += '\n' + player.getPlayerDescription();
     
     const indexToRemove = world.items.findIndex(item => item === oneItemToUse);
@@ -51,7 +44,7 @@ export function handleItemUse(params) {
     updatePlayerStats(session, { itemFound: true, heroLevel: player.heroLevel, coinsGained: useResult.coinsGained });
 
     const npcsAtLocation = world.getNPCsAtLocation(x, y);
-    const agressiveNPCs = npcsAtLocation.filter(npc => npc.isAggressive());
+    const agressiveNPCs = npcsAtLocation.filter(npc => npc.isAggressiveMonster());
     let isPlayerDied = false;
     
     if (agressiveNPCs.length > 0) {

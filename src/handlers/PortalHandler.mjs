@@ -1,4 +1,5 @@
 import { allAgressiveNPCAttackPlayer } from '../Game.mjs';
+import { PLAYER_SETTINGS } from '../GameSetup.mjs';
 
 /**
  * Обработка использования портала (portal)
@@ -39,8 +40,10 @@ export function handlePortal(params) {
 
         world.setup(width, height);
         world.generate();
-        player.setup(width, height, player.name);
-        player.clearAttributes();
+        player.maxWidth = width;
+        player.maxHeight = height;
+        player.visitedCells = new Set();
+        player.visibleCells = new Set();
         player.setRandomLocation();
 
         const nx = player.getX();
@@ -51,6 +54,7 @@ export function handlePortal(params) {
         world.generateItems(nx, ny);
         world.generatePortals(nx, ny);
         player.markCellVisited(nx, ny);
+        player.markAreaVisible(nx, ny, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
 
         world.recalculateNPCsForLevel(player.heroLevel);
 
@@ -59,7 +63,7 @@ export function handlePortal(params) {
         const locationMessage =
             world.GetLocationText(nx, ny, player) +
             player.getLocationCoords() +
-            world.printWorldMap(nx, ny);
+            world.printWorldMap(nx, ny, player);
         message += locationMessage;
 
         updateGlobalStats({ worldChange: true });
@@ -86,6 +90,7 @@ export function handlePortal(params) {
     } while (newX === x && newY === y);
 
     player.setPosition(newX, newY);
+    player.markAreaVisible(newX, newY, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
     const portalAtNewLocation = world.getPortalAtLocation(newX, newY);
     if (portalAtNewLocation) {
         portalAtNewLocation.visited = true;
@@ -93,7 +98,7 @@ export function handlePortal(params) {
     message += `${STAT_EMOJI.PORTAL} Вы зашли в портал и телепортировались в случайную точку мира!\n\n`;
     
     const npcsAtNewLocation = world.getNPCsAtLocation(newX, newY);
-    const agressiveNPCsAtNewLocation = npcsAtNewLocation.filter(npc => npc.isAggressive());
+    const agressiveNPCsAtNewLocation = npcsAtNewLocation.filter(npc => npc.isAggressiveMonster());
     
     if (agressiveNPCsAtNewLocation.length > 0) {
         const npcAttackResult = allAgressiveNPCAttackPlayer(world, player);
@@ -136,7 +141,7 @@ export function handlePortal(params) {
     const locationMessage =
         world.GetLocationText(newX, newY, player) +
         player.getLocationCoords() +
-        world.printWorldMap(newX, newY);
+        world.printWorldMap(newX, newY, player);
     message += locationMessage;
 
     const buttons = generateInlineButtons(

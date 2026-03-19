@@ -5,7 +5,7 @@ import { PLAYER_SETTINGS } from './GameSetup.mjs';
 const PLAYER_TEXT = {
     PICKED_COINS: 'Вы подобрали ',
     PICKED_ITEM: 'Вы подобрали ',
-    COINS_SUFFIX: ' монет\n',
+    COINS_SUFFIX: ' монет',
     ITEM_SUFFIX: '\n',
     LEVEL_PREFIX: ' (ур. ',
     LEVEL_SUFFIX: ')',
@@ -39,6 +39,32 @@ export class Player {
         this.hitChanceBase = BASE_HIT_CHANCE;
         this.hitChanceBonusPerLevel = HIT_CHANCE_BONUS_PER_LEVEL;
         this.visitedCells = new Set();
+        this.visibleCells = new Set();
+    }
+    
+    // Пометить все клетки в радиусе как видимые
+    markAreaVisible(centerX, centerY, radiusH, radiusV) {
+        for (let dx = -radiusH; dx <= radiusH; dx++) {
+            for (let dy = -radiusV; dy <= radiusV; dy++) {
+                const nx = centerX + dx;
+                const ny = centerY + dy;
+                
+                if (nx < 0 || nx >= this.maxWidth || ny < 0 || ny >= this.maxHeight) continue;
+                
+                const manhattanDist = Math.abs(dx) + Math.abs(dy);
+                
+                if (manhattanDist <= radiusH) {
+                    const key = `${nx},${ny}`;
+                    this.visibleCells.add(key);
+                    this.visitedCells.add(key);
+                }
+            }
+        }
+    }
+    
+    // Проверить, видна ли клетка
+    isCellVisible(x, y) {
+        return this.visibleCells.has(`${x},${y}`);
     }
 
     // Получение текущего шанса попадания с учетом уровня и эвента
@@ -49,11 +75,16 @@ export class Player {
     // Использование/подбор предмета
     useItem(inItem) {
         let coinsGained = 0;
+        let xpGained = 0;
         
         if (inItem.isCoin) {
             this.coins += inItem.coins;
             coinsGained = inItem.coins;
-            return { text: PLAYER_TEXT.PICKED_COINS + inItem.coins + PLAYER_TEXT.COINS_SUFFIX, coinsGained };
+            xpGained = Math.floor(inItem.coins / 2);
+            this.addExperience(xpGained);
+            const coinWord = inItem.coins === 1 ? 'Монету' : 'Монет';
+            const xpText = xpGained > 0 ? ` и получили ✨ +${xpGained} Опыта` : '';
+            return { text: PLAYER_TEXT.PICKED_COINS + STAT_EMOJI.COINS + ' ' + inItem.coins + ' ' + coinWord + xpText + '\n', coinsGained, xpGained };
         }
         if (inItem.isWeapon) {
             this.minAttackPower += inItem.minAttackPower;
@@ -61,10 +92,14 @@ export class Player {
             if (this.minAttackPower > this.maxAttackPower) {
                 this.maxAttackPower = this.minAttackPower;
             }
+            xpGained = inItem.minAttackPower + inItem.maxAttackPower;
+            this.addExperience(xpGained);
         }
         if (inItem.isHealing) {
             this.maxHealth += inItem.maxHealth;
             this.modifyHealth(inItem.health);
+            xpGained = Math.floor((inItem.health + inItem.maxHealth) / 2);
+            this.addExperience(xpGained);
         }
 
         const bonuses = [];
@@ -82,7 +117,8 @@ export class Player {
         }
 
         const bonusText = bonuses.length > 0 ? ' ' + bonuses.join(', ') : '';
-        return { text: PLAYER_TEXT.PICKED_ITEM + inItem.name + bonusText + '\n', coinsGained };
+        const xpText = xpGained > 0 ? ` и получили ✨ +${xpGained} Опыта` : '';
+        return { text: PLAYER_TEXT.PICKED_ITEM + inItem.name + bonusText + xpText + '\n', coinsGained, xpGained };
     }
 
     // Расчет требуемого опыта для уровня (статический метод)
