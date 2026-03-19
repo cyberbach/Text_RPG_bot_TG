@@ -12,6 +12,7 @@ export const DEBUG_PORTAL_MASS_SPAWN = false;              // Спавн пор�
 export const DEBUG_LOG_SPAWN = true;                      // Логирование статистики спавна (порталы, предметы, NPC)
 export const DEBUG_LOG_PORTAL = false;                     // Логирование создания порталов
 export const DEBUG_SHOW_MISS_REASON = false;                 // Показывать причину промаха при атаке
+export const DEBUG_BOSS_VISIBLE = false;                       // Показывать босса на карте
 
 // Вероятности спавна сущностей (0.0 - 1.0)
 export const SPAWN_CHANCES = Object.freeze({

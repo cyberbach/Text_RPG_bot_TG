@@ -327,9 +327,19 @@ bot.onText(/\/info/, (msg) => {
 const lastCallbackTime = new Map();
 const CALLBACK_COOLDOWN = 500;
 
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getRandomDelay() {
+    return 200 + Math.floor(Math.random() * 800);
+}
+
 // ================= CALLBACK QUERY ===================
-bot.on('callback_query', (query) => {
+bot.on('callback_query', async (query) => {
     if (!query.data) return;
+    
+    await delay(getRandomDelay());
     
     const action = query.data;
     const currentChatID = query.message.chat.id;

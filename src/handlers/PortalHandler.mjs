@@ -51,8 +51,11 @@ export function handlePortal(params) {
         world.generateNPC(nx, ny);
         world.generateMerchant(nx, ny);
         world.generateQuestGiver(nx, ny);
+        world.generateStoryteller(nx, ny);
         world.generateItems(nx, ny);
         world.generatePortals(nx, ny);
+        world.generateBoss(nx, ny);
+        world.setPortalHintsForQuestGivers();
         player.markCellVisited(nx, ny);
         player.markAreaVisible(nx, ny, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
 

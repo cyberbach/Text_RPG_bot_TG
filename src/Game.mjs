@@ -2,6 +2,8 @@ import { getHitChanceModifier, getCurrentEvent } from './EventSystem.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 import { getRandomMissReason, LIGHTNING_MESSAGES } from './TextEnums/MissReasons.mjs';
 import { SPAWN_CHANCES } from './GameSetup.mjs';
+import { NPC_TYPE } from './NPC.mjs';
+import { Item } from './Item.mjs';
 
 // Атака игроком всех NPC на текущей локации
 export function playerAttackNPC(inWorld, inPlayer) {
@@ -41,6 +43,11 @@ export function playerAttackNPC(inWorld, inPlayer) {
                 const coinWord = coinAmount === 1 ? 'Монету' : 'Монет';
                 const xpText = xpGained > 0 ? ` и получили ✨ +${xpGained} Опыта` : '';
                 attackResult += `Вы получили ${STAT_EMOJI.COINS} ${coinAmount} ${coinWord}${xpText}\n`;
+                
+                if (oneNpc.npcType === NPC_TYPE.BOSS) {
+                    const bossDrop = generateBossDrop(inPlayer, inWorld, x, y);
+                    attackResult += bossDrop.message;
+                }
                 
                 inWorld.generateOneItem(x, y);
                 npcsToRemove.push(oneNpc);
@@ -154,4 +161,42 @@ export function lightningStrike(inWorld, inPlayer) {
         target,
         isPlayer
     };
+}
+
+// Генерация дропа с босса
+function generateBossDrop(player, world, x, y) {
+    const dropType = Math.floor(Math.random() * 3);
+    
+    const newItem = new Item();
+    
+    if (dropType === 0) {
+        const coins = 50 + Math.floor(Math.random() * 50);
+        const coinWord = coins === 1 ? 'Монету' : (coins >= 5 && coins <= 20 ? 'Монеты' : 'Монет');
+        player.coins += coins;
+        return { message: `💰 Сокровищница босса! Вы получили ${coins} ${coinWord}!\n` };
+    }
+    
+    if (dropType === 1) {
+        newItem.isCoin = false;
+        newItem.isWeapon = true;
+        newItem.isHealing = false;
+        newItem.x = x;
+        newItem.y = y;
+        newItem.minAttackPower = Math.floor(player.maxAttackPower * 0.5) + 5;
+        newItem.maxAttackPower = Math.floor(player.maxAttackPower * 0.8) + 10;
+        newItem.name = '🗡️ Легендарное Оружие Босса';
+        world.items.push(newItem);
+        return { message: `⚔️ Босс оставил мощное оружие! Подберите его!\n` };
+    }
+    
+    newItem.isCoin = false;
+    newItem.isHealing = true;
+    newItem.isWeapon = false;
+    newItem.x = x;
+    newItem.y = y;
+    newItem.health = Math.floor(player.maxHealth * 0.5) + 20;
+    newItem.maxHealth = Math.floor(player.maxHealth * 0.3) + 10;
+    newItem.name = '🧪 Легендарное Зелье Босса';
+    world.items.push(newItem);
+    return { message: `❤️ Босс оставил легендарное зелье! Подберите его!\n` };
 }

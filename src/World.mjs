@@ -10,7 +10,7 @@ import { CharacterNames } from './TextEnums/CharacterNames.mjs';
 import { MonsterNames } from './TextEnums/MonsterNames.mjs';
 import { Item } from './Item.mjs';
 import { Portal } from './Portal.mjs';
-import { DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_PORTAL_MASS_SPAWN, DEBUG_LOG_SPAWN, SPAWN_CHANCES, NPC_SETTINGS, PORTAL_SETTINGS } from './GameSetup.mjs';
+import { DEBUG_MERCHANT_QUEST_MASS_SPAWN, DEBUG_PORTAL_MASS_SPAWN, DEBUG_LOG_SPAWN, DEBUG_BOSS_VISIBLE, SPAWN_CHANCES, NPC_SETTINGS, PORTAL_SETTINGS } from './GameSetup.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
 import { LOCATION_LETTER_TO_SYMBOL, MAP_SYMBOLS } from './TextEnums/MapSymbols.mjs';
 
@@ -426,10 +426,12 @@ export class WorldGenerator {
         // Выбираем случайный портал
         const portal = this.portals[Math.floor(Math.random() * this.portals.length)];
 
-        // Ищем свободную клетку рядом с порталом
+        // Ищем свободную клетку рядом с порталом (только соседние)
         const possiblePositions = [];
-        for (let dx = -BOSS_SPAWN_RADIUS; dx <= BOSS_SPAWN_RADIUS; dx++) {
-            for (let dy = -BOSS_SPAWN_RADIUS; dy <= BOSS_SPAWN_RADIUS; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                if (dx === 0 && dy === 0) continue;
+                
                 const nx = portal.x + dx;
                 const ny = portal.y + dy;
                 
@@ -437,10 +439,7 @@ export class WorldGenerator {
                 if (nx === excludeX && ny === excludeY) continue;
                 if (this.hasAggressiveNPC(nx, ny)) continue;
                 
-                const dist = Math.abs(dx) + Math.abs(dy);
-                if (dist > 0 && dist <= BOSS_SPAWN_RADIUS) {
-                    possiblePositions.push([nx, ny]);
-                }
+                possiblePositions.push([nx, ny]);
             }
         }
 
@@ -460,6 +459,8 @@ export class WorldGenerator {
         boss.health = boss.maxHealth;
         boss.minAttackPower *= BOSS_ATTACK_MULTIPLIER;
         boss.maxAttackPower *= BOSS_ATTACK_MULTIPLIER;
+        
+        console.log(`[DEBUG] Boss spawned at (${bossX}, ${bossY}) near portal at (${portal.x}, ${portal.y})`);
 
         this.npcs.push(boss);
     }
@@ -528,6 +529,13 @@ export class WorldGenerator {
                     displaySymbol = MAP_SYMBOLS.PLAYER;
                 } else if (this.getPortalAtLocation(j, i)?.visited) {
                     displaySymbol = MAP_SYMBOLS.PORTAL;
+                } else if (DEBUG_BOSS_VISIBLE) {
+                    const bossHere = this.npcs.find(npc => 
+                        npc.npcType === NPC_TYPE.BOSS && npc.x === j && npc.y === i
+                    );
+                    if (bossHere) {
+                        displaySymbol = MAP_SYMBOLS.BOSS;
+                    }
                 }
 
                 rowSymbols.push(displaySymbol);

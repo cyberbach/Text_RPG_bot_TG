@@ -14,8 +14,8 @@ export const MAP_SYMBOLS = Object.freeze({
     CITY: '⌂',
     PLAYER: '●',
     PORTAL: '@',
+    BOSS: '👹',
     FOG: ' ',
-    //FOG: '░',
 });
 
 // Соответствие первой буквы типа локации символу
