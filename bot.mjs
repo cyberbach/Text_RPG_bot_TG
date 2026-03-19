@@ -12,7 +12,7 @@ import { NPC_TYPE } from './src/NPC.mjs';
 import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
 import { generateInlineButtons, generateDeathButtons } from './src/TelegramButtons.mjs';
-import { handleMovement, handleCombat, handleItemUse, handleTakeAllItems, handleBuy, handleHelp, handlePortal } from './src/handlers/index.mjs';
+import { handleMovement, handleCombat, handleItemUse, handleTakeAllItems, handleBuy, handleHelp, handlePortal, startRiddleSession, handleRiddleAnswer, getCurrentRiddle, isRiddleActive } from './src/handlers/index.mjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -179,6 +179,7 @@ function setupNewGame(session, options) {
     session.world.generateNPC(x, y);
     session.world.generateMerchant(x, y);
     session.world.generateQuestGiver(x, y);
+    session.world.generateStoryteller(x, y);
     session.world.generateItems(x, y);
     session.world.generatePortals(x, y);
     session.world.setPortalHintsForQuestGivers();
@@ -190,6 +191,7 @@ function setupNewGame(session, options) {
         const npcs = session.world.npcs;
         const merchants = npcs.filter(n => n.npcType === NPC_TYPE.MERCHANT);
         const questGivers = npcs.filter(n => n.npcType === NPC_TYPE.QUEST_GIVER);
+        const storytellers = npcs.filter(n => n.npcType === NPC_TYPE.STORYTELLER);
         const aggressive = npcs.filter(n => n.npcType === NPC_TYPE.AGGRESSIVE);
         const neutral = npcs.filter(n => n.npcType === NPC_TYPE.NEUTRAL);
         const bosses = npcs.filter(n => n.npcType === NPC_TYPE.BOSS);
@@ -197,7 +199,7 @@ function setupNewGame(session, options) {
         console.log(`[DEBUG] === WORLD SPAWN STATS ===`);
         console.log(`[DEBUG] NPCs: ${npcs.length}`);
         console.log(`[DEBUG]   Aggressive: ${aggressive.length}`);
-        console.log(`[DEBUG]   Neutral: ${neutral.length + merchants.length + questGivers.length} (Neutral creatures: ${neutral.length}, Merchants: ${merchants.length}, Quest Givers: ${questGivers.length})`);
+        console.log(`[DEBUG]   Neutral: ${neutral.length + merchants.length + questGivers.length + storytellers.length} (Neutral creatures: ${neutral.length}, Merchants: ${merchants.length}, Quest Givers: ${questGivers.length}, Storytellers: ${storytellers.length})`);
         if (bosses.length > 0) {
             console.log(`[DEBUG]   Bosses: ${bosses.length}`);
         }
@@ -453,6 +455,73 @@ bot.on('callback_query', (query) => {
     // ============ PORTAL ===============
     else if (action === 'portal') {
         result = handlePortal(handlerParams);
+    }
+    // ============ PUZZLE ===============
+    else if (action === 'puzzle') {
+        const riddleResult = startRiddleSession(session, world, player.getX(), player.getY());
+        if (riddleResult.success) {
+            const riddleInfo = getCurrentRiddle({
+                session,
+                world,
+                STAT_EMOJI,
+                generateInlineButtons
+            });
+            result = { 
+                message: riddleInfo.message, 
+                buttons: riddleInfo.buttons,
+                removeKeyboard: false,
+                editOnly: false
+            };
+        } else {
+            result = { message: riddleResult.error, buttons: null, removeKeyboard: false };
+        }
+    }
+    // ============ RIDDLE ANSWER ===============
+    else if (action.startsWith('riddle_answer_')) {
+        const answerIndex = parseInt(action.replace('riddle_answer_', ''), 10);
+        
+        if (isRiddleActive(session)) {
+            const state = session.riddleState;
+            const currentRiddle = state.riddles[state.currentIndex];
+            const selectedAnswer = currentRiddle.answers[answerIndex];
+            
+            const riddleResult = handleRiddleAnswer({
+                session,
+                player,
+                world,
+                answer: selectedAnswer,
+                updateGlobalStats,
+                updatePlayerStats,
+                STAT_EMOJI
+            });
+            
+            if (riddleResult.riddleEnded) {
+                const locX = riddleResult.x !== undefined ? riddleResult.x : player.getX();
+                const locY = riddleResult.y !== undefined ? riddleResult.y : player.getY();
+                result = {
+                    message: riddleResult.message,
+                    buttons: generateInlineButtons(
+                        world.getAvailableDirections(locX, locY),
+                        world.getAvailableActions(locX, locY)
+                    ),
+                    removeKeyboard: false
+                };
+            } else {
+                const nextRiddle = getCurrentRiddle({
+                    session,
+                    world,
+                    STAT_EMOJI,
+                    generateInlineButtons
+                });
+                result = {
+                    message: riddleResult.message + '\n\n' + nextRiddle.message,
+                    buttons: nextRiddle.buttons,
+                    removeKeyboard: false
+                };
+            }
+        } else {
+            result = { message: 'Нет активной головоломки.', buttons: null, removeKeyboard: false };
+        }
     }
 
     // Отправка результата

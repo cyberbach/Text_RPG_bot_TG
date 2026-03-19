@@ -46,4 +46,8 @@ export const TG_ACTIONS = {
         text: 'Взять все 📦',
         callback: 'take_all',
     },
+    puzzle: {
+        text: 'Головоломка 🧩',
+        callback: 'puzzle',
+    },
 };

@@ -359,6 +359,37 @@ export class WorldGenerator {
         }
     }
 
+    // Создание NPC-сказочника
+    generateStoryteller(excludeX, excludeY) {
+        const storytellerNames = [
+            'Старый Мудрец', 'Лесная Ведунья', 'Странствующий Бард', 
+            'Хранитель Сказок', 'Лунный Путник', 'Тихий Странник',
+            'Сказочный Гений', 'Древний Летописец'
+        ];
+        
+        const generateName = () => {
+            const names = Object.values(storytellerNames);
+            return names[Math.floor(Math.random() * names.length)];
+        };
+
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (x === excludeX && y === excludeY) continue;
+                if (this.hasAggressiveNPC(x, y)) continue;
+
+                if (Math.random() < SPAWN_CHANCES.STORYTELLER) {
+                    const storyteller = new NPC();
+                    storyteller.npcType = NPC_TYPE.STORYTELLER;
+                    storyteller.agressive = false;
+                    storyteller.x = x;
+                    storyteller.y = y;
+                    storyteller.name = generateName();
+                    this.npcs.push(storyteller);
+                }
+            }
+        }
+    }
+
     // Генерация порталов
     generatePortals(excludeX, excludeY) {
         const { WORLD_PORTAL_COUNT } = PORTAL_SETTINGS;
@@ -577,6 +608,13 @@ export class WorldGenerator {
         this.npcs.forEach((npc) => {
             if (npc.isQuestGiver() && npc.x === a && npc.y === b) {
                 resultArray.push('help');
+            }
+        });
+
+        // Проверка наличия сказочника
+        this.npcs.forEach((npc) => {
+            if (npc.isStoryteller() && npc.x === a && npc.y === b) {
+                resultArray.push('puzzle');
             }
         });
 

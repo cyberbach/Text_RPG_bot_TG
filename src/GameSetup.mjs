@@ -18,6 +18,7 @@ export const SPAWN_CHANCES = Object.freeze({
     MONSTER: 0.3,
     MERCHANT: 0.05,
     QUEST_GIVER: 0.15,
+    STORYTELLER: 0.12,
     PORTAL: 0.1,
     ITEM: 0.15,
     WEAPON: 0.12,

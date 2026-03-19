@@ -3,4 +3,5 @@ export const NPC_TEXT = Object.freeze({
     MONET_SUFFIX: ' монет)',
     QUEST_NEED_HELP: 'просит помочь)',
     PEACEFUL: 'мирный)',
+    STORYTELLER_ASKING: 'хочет загадать загадку)',
 });

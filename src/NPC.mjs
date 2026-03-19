@@ -10,6 +10,7 @@ export const NPC_TYPE = Object.freeze({
     MERCHANT: 'merchant',
     QUEST_GIVER: 'quest_giver',
     BOSS: 'boss',
+    STORYTELLER: 'storyteller',
 });
 
 export class NPC {
@@ -30,6 +31,7 @@ export class NPC {
         this.merchantUsed = false;
         this.merchantPrice = 0;
         this.portalHint = null;
+        this.storytellerUsed = false;
     }
     
     setPortalHint(hint) {
@@ -81,6 +83,10 @@ export class NPC {
                 descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.QUEST_NEED_HELP;
             } else if (this.npcType === NPC_TYPE.QUEST_GIVER && this.questCompleted) {
                 descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
+            } else if (this.npcType === NPC_TYPE.STORYTELLER && !this.storytellerUsed) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.STORYTELLER_ASKING;
+            } else if (this.npcType === NPC_TYPE.STORYTELLER && this.storytellerUsed) {
+                descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
             } else if (this.npcType === NPC_TYPE.MERCHANT && this.merchantUsed) {
                 descriptionString += STAT_EMOJI.FULL_HEALTH + ' (' + NPC_TEXT.PEACEFUL;
             } else {
@@ -112,6 +118,10 @@ export class NPC {
 
     isBoss() {
         return this.npcType === NPC_TYPE.BOSS;
+    }
+    
+    isStoryteller() {
+        return this.npcType === NPC_TYPE.STORYTELLER && !this.storytellerUsed;
     }
 
     becomeAggressive() {
