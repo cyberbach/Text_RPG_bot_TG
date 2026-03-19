@@ -12,7 +12,7 @@ import { NPC_TYPE } from './src/NPC.mjs';
 import { STAT_EMOJI } from './src/TextEnums/SmileInText.mjs';
 import { TG_MOVE_DIRECTIONS, TG_ACTIONS } from './src/TelegramAPIConstants.mjs';
 import { generateInlineButtons, generateDeathButtons } from './src/TelegramButtons.mjs';
-import { handleMovement, handleCombat, handleItemUse, handleBuy, handleHelp, handlePortal } from './src/handlers/index.mjs';
+import { handleMovement, handleCombat, handleItemUse, handleTakeAllItems, handleBuy, handleHelp, handlePortal } from './src/handlers/index.mjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -181,6 +181,7 @@ function setupNewGame(session, options) {
     session.world.generateQuestGiver(x, y);
     session.world.generateItems(x, y);
     session.world.generatePortals(x, y);
+    session.world.setPortalHintsForQuestGivers();
     session.world.generateBoss(x, y);
     session.player.markCellVisited(x, y);
     session.player.markAreaVisible(x, y, PLAYER_SETTINGS.VISIBILITY_WIDTH, PLAYER_SETTINGS.VISIBILITY_HEIGHT);
@@ -430,6 +431,11 @@ bot.on('callback_query', (query) => {
     else if (action === 'use') {
         session.combatState = false;
         result = handleItemUse(handlerParams);
+    }
+    // ============ TAKE ALL ===============
+    else if (action === 'take_all') {
+        session.combatState = false;
+        result = handleTakeAllItems(handlerParams);
     }
     // ============ ATTACK ===============
     else if (action === 'attack') {

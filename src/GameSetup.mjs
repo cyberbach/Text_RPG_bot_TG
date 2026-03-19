@@ -17,7 +17,7 @@ export const DEBUG_SHOW_MISS_REASON = false;                 // Показыва
 export const SPAWN_CHANCES = Object.freeze({
     MONSTER: 0.3,
     MERCHANT: 0.05,
-    QUEST_GIVER: 0.05,
+    QUEST_GIVER: 0.15,
     PORTAL: 0.1,
     ITEM: 0.15,
     WEAPON: 0.12,

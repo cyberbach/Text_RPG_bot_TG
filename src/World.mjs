@@ -580,8 +580,13 @@ export class WorldGenerator {
             }
         });
 
-        if (this.getItemsAtLocation(a, b).length > 0) {
-            resultArray.push('use');
+        const itemsOnLocation = this.getItemsAtLocation(a, b);
+        if (itemsOnLocation.length > 0) {
+            if (aggresiveNpcs.length === 0 && itemsOnLocation.length > 1) {
+                resultArray.push('take_all');
+            } else {
+                resultArray.push('use');
+            }
         }
 
         if (this.getPortalAtLocation(a, b)) {
@@ -626,12 +631,22 @@ export class WorldGenerator {
         if (npcObjectsToDisplay.length > 0) {
             resultString += 'Обитатели на локации:\n'; //👥
             npcObjectsToDisplay.forEach((oneNpc) => {
-                resultString += oneNpc.getNpcDescription();
+                resultString += oneNpc.getNpcDescription(this);
             });
             resultString += '\n';
         }
 
         return resultString;
+    }
+    
+    // Установить подсказки о порталах для всех квестодателей
+    setPortalHintsForQuestGivers() {
+        this.npcs.forEach(npc => {
+            if (npc.npcType === NPC_TYPE.QUEST_GIVER) {
+                const hint = this.getDirectionToNearestPortal(npc.x, npc.y);
+                npc.setPortalHint(hint);
+            }
+        });
     }
 
     // Пересчет характеристик NPC в зависимости от уровня игрока
@@ -731,5 +746,46 @@ export class WorldGenerator {
         }
 
         return '';
+    }
+    
+    // Получить направление и расстояние до ближайшего портала
+    getDirectionToNearestPortal(x, y) {
+        if (this.portals.length === 0) return null;
+        
+        let nearestPortal = null;
+        let minDistance = Infinity;
+        
+        for (const portal of this.portals) {
+            const distance = Math.abs(portal.x - x) + Math.abs(portal.y - y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestPortal = portal;
+            }
+        }
+        
+        if (!nearestPortal) return null;
+        
+        const dx = nearestPortal.x - x;
+        const dy = nearestPortal.y - y;
+        
+        const directions = [];
+        
+        if (dy < 0) {
+            directions.push(`${Math.abs(dy)} дней на север`);
+        } else if (dy > 0) {
+            directions.push(`${dy} дней на юг`);
+        }
+        
+        if (dx > 0) {
+            directions.push(`${dx} дней на восток`);
+        } else if (dx < 0) {
+            directions.push(`${Math.abs(dx)} дней на запад`);
+        }
+        
+        if (directions.length === 0) {
+            return 'Портал прямо здесь!';
+        }
+        
+        return `Иди ${directions.join(' и ')}.`;
     }
 }

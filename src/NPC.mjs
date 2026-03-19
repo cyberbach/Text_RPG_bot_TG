@@ -29,6 +29,11 @@ export class NPC {
         this.questCompleted = false;
         this.merchantUsed = false;
         this.merchantPrice = 0;
+        this.portalHint = null;
+    }
+    
+    setPortalHint(hint) {
+        this.portalHint = hint;
     }
 
     setup(worldWidth, worldHeight, excludeX, excludeY) {
@@ -59,7 +64,7 @@ export class NPC {
         }
     }
 
-    getNpcDescription() {
+    getNpcDescription(world = null) {
         const attackString = STAT_EMOJI.ATTACK + ' ' + this.minAttackPower + '..' + this.maxAttackPower;
         let descriptionString = '';
 
@@ -115,24 +120,37 @@ export class NPC {
     }
 
     getQuestReward() {
-        const hasCoins = Math.random() > 0.3;
+        const hasReward = Math.random() > 0.3;
         const { COINS_REWARD } = QUEST_SETTINGS;
-        const coinsReward = hasCoins ? 
-            COINS_REWARD.MIN + Math.floor(Math.random() * (COINS_REWARD.MAX - COINS_REWARD.MIN + 1)) : 0;
         
-        const hasItem = Math.random() > 0.4;
-        const hasGoodItem = Math.random() > 0.5;
-        const { WEAPON_REWARD, HEALING_REWARD } = QUEST_SETTINGS;
-        const itemReward = hasItem ? {
-            isWeapon: hasGoodItem,
-            isHealing: !hasGoodItem,
-            minAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK) : 0,
-            maxAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK * 1.5) : 0,
-            health: !hasGoodItem ? HEALING_REWARD.HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.HEALTH_MAX - HEALING_REWARD.HEALTH_MIN)) : 0,
-            maxHealth: !hasGoodItem ? HEALING_REWARD.MAX_HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.MAX_HEALTH_MAX - HEALING_REWARD.MAX_HEALTH_MIN)) : 0,
-        } : null;
-
+        let coinsReward = 0;
+        let itemReward = null;
+        
+        if (hasReward) {
+            coinsReward = Math.random() > 0.5 
+                ? COINS_REWARD.MIN + Math.floor(Math.random() * (COINS_REWARD.MAX - COINS_REWARD.MIN + 1)) 
+                : 0;
+            
+            const hasItem = Math.random() > 0.4;
+            if (hasItem) {
+                const hasGoodItem = Math.random() > 0.5;
+                const { WEAPON_REWARD, HEALING_REWARD } = QUEST_SETTINGS;
+                itemReward = {
+                    isWeapon: hasGoodItem,
+                    isHealing: !hasGoodItem,
+                    minAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK) : 0,
+                    maxAttackPower: hasGoodItem ? WEAPON_REWARD.MIN_ATTACK + Math.floor(Math.random() * WEAPON_REWARD.MAX_ATTACK * 1.5) : 0,
+                    health: !hasGoodItem ? HEALING_REWARD.HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.HEALTH_MAX - HEALING_REWARD.HEALTH_MIN)) : 0,
+                    maxHealth: !hasGoodItem ? HEALING_REWARD.MAX_HEALTH_MIN + Math.floor(Math.random() * (HEALING_REWARD.MAX_HEALTH_MAX - HEALING_REWARD.MAX_HEALTH_MIN)) : 0,
+                };
+            }
+        }
+        
         return { coinsReward, itemReward };
+    }
+    
+    willGiveHint() {
+        return Math.random() > 0.5;
     }
 
     didHelpSucceed() {

@@ -42,4 +42,8 @@ export const TG_ACTIONS = {
         text: 'В портал 🌀',
         callback: 'portal',
     },
+    take_all: {
+        text: 'Взять все 📦',
+        callback: 'take_all',
+    },
 };

@@ -139,6 +139,11 @@ export function handleHelp(params) {
                 message += `Вы помогли ${questGiverFound.name}, но не получили награды.\n`;
             }
             
+            if (questGiverFound.willGiveHint()) {
+                const portalHint = world.getDirectionToNearestPortal(x, y);
+                message += `${questGiverFound.name} говорит: "${portalHint}"\n`;
+            }
+            
             questGiverFound.questCompleted = true;
             updatePlayerStats(session, { questCompleted: true });
             updateGlobalStats({ questCompleted: true });
