@@ -79,7 +79,7 @@ export function handleRiddleAnswer(params) {
     state.currentIndex++;
     
     if (state.currentIndex >= state.riddles.length) {
-        const xpReward = Math.floor(player.maxHealth * XP_REWARD_PERCENT * state.correctAnswers / state.totalRiddles);
+        const xpReward = Math.floor(player.getXPToNextLevel() * XP_REWARD_PERCENT * state.correctAnswers);
         
         if (xpReward > 0) {
             const result = player.addExperience(xpReward);
