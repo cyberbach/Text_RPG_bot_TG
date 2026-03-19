@@ -1,4 +1,4 @@
-import { allAgressiveNPCAttackPlayer, playerAttackNPC } from '../Game.mjs';
+import { allAgressiveNPCAttackPlayer, playerAttackNPC, lightningStrike } from '../Game.mjs';
 
 /**
  * Обработка атаки игрока (attack)
@@ -53,6 +53,23 @@ export function handleCombat(params) {
         damageTaken: npcAttackResult.stats.damageTaken,
         coinsGained: playerAttackResult.stats.coinsGained,
     });
+
+    // Проверка удара молнией
+    const lightningResult = lightningStrike(world, player);
+    if (lightningResult) {
+        message += '\n' + lightningResult.text;
+        if (lightningResult.isPlayer) {
+            updateGlobalStats({ damageTaken: lightningResult.damage });
+            updatePlayerStats(session, { damageTaken: lightningResult.damage });
+            if (player.health <= 0) {
+                message += '\n' + STAT_EMOJI.DEAD + ' ВЫ ПОГИБЛИ! Игра окончена.\nНажмите /start чтобы начать заново.';
+                updateGlobalStats({ gameCompleted: true, death: true });
+                updatePlayerStats(session, { gameCompleted: true, death: true });
+                session.combatState = false;
+                return { message, buttons: generateDeathButtons(), removeKeyboard: true };
+            }
+        }
+    }
 
     message += '\n';
     let liveNPCs = world.getNPCsAtLocation(x, y);

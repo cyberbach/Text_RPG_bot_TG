@@ -1,5 +1,7 @@
-import { getHitChanceModifier } from './EventSystem.mjs';
+import { getHitChanceModifier, getCurrentEvent } from './EventSystem.mjs';
 import { STAT_EMOJI } from './TextEnums/SmileInText.mjs';
+import { getRandomMissReason, LIGHTNING_MESSAGES } from './TextEnums/MissReasons.mjs';
+import { SPAWN_CHANCES } from './GameSetup.mjs';
 
 // Атака игроком всех NPC на текущей локации
 export function playerAttackNPC(inWorld, inPlayer) {
@@ -39,7 +41,11 @@ export function playerAttackNPC(inWorld, inPlayer) {
                 inWorld.generateOneItem(x, y);
             }
         } else {
-            attackResult += inPlayer.name + ' промахнулся\n';
+            let missText = inPlayer.name + ' промахнулся';
+            if (Math.random() < SPAWN_CHANCES.MISS_REASON) {
+                missText += ' (' + getRandomMissReason(getCurrentEvent()) + ')';
+            }
+            attackResult += missText + '\n';
         }
     });
 
@@ -82,10 +88,58 @@ export function allAgressiveNPCAttackPlayer(inWorld, inPlayer, attackX, attackY)
                         inPlayer.name + ' ' + STAT_EMOJI.KILL + '\n\nКОНЕЦ ИГРЫ!\n';
                 }
             } else {
-                attackResult += oneNpc.name + ' промахнулся\n';
+                let missText = oneNpc.name + ' промахнулся';
+                if (Math.random() < SPAWN_CHANCES.MISS_REASON) {
+                    missText += ' (' + getRandomMissReason(getCurrentEvent()) + ')';
+                }
+                attackResult += missText + '\n';
             }
         }
     });
 
     return { text: attackResult, stats };
+}
+
+// Удар молнией во время боя (только во время дождя)
+export function lightningStrike(inWorld, inPlayer) {
+    const currentWeather = getCurrentEvent();
+    if (currentWeather !== 'weather_rainy') {
+        return null;
+    }
+    
+    if (Math.random() >= SPAWN_CHANCES.LIGHTNING) {
+        return null;
+    }
+    
+    const targets = [...inWorld.getNPCsAtLocation(inPlayer.getX(), inPlayer.getY()), inPlayer];
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    
+    const isPlayer = target === inPlayer;
+    const damage = target.maxAttackPower;
+    
+    const lightningMessage = LIGHTNING_MESSAGES[Math.floor(Math.random() * LIGHTNING_MESSAGES.length)];
+    
+    let result = STAT_EMOJI.WEATHER_STORMY + ' ' + lightningMessage + '\n';
+    
+    if (isPlayer) {
+        inPlayer.modifyHealth(-damage);
+        result += `${target.name} получает ${damage} урона от молнии!\n`;
+    } else {
+        target.modifyHealth(-damage);
+        result += `${target.name} получает ${damage} урона от молнии!\n`;
+        if (target.health <= 0) {
+            const indexToRemove = inWorld.npcs.findIndex(npc => npc === target);
+            if (indexToRemove !== -1) {
+                inWorld.npcs.splice(indexToRemove, 1);
+            }
+            result += target.name + ' ' + STAT_EMOJI.KILL + '\n';
+        }
+    }
+    
+    return { 
+        text: result,
+        damage,
+        target,
+        isPlayer
+    };
 }

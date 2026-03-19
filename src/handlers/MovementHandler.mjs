@@ -64,16 +64,7 @@ export function handleMovement(params) {
             world.getAvailableActions(x, y)
         );
 
-        if (query.message) {
-            bot.editMessageText(message, {
-                chat_id: query.message.chat.id,
-                message_id: query.message.message_id,
-                reply_markup: JSON.stringify({ inline_keyboard: [] }),
-                parse_mode: 'Markdown'
-            });
-        }
-
-        return { message, buttons, removeKeyboard: true, editOnly: true };
+        return { message, buttons, removeKeyboard: false };
     }
 
     const npcsOnOldLocation = world.getNPCsAtLocation(oldX, oldY);

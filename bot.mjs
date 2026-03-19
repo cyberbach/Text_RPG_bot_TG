@@ -17,6 +17,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Обработчик необработанных ошибок (Telegram API может выбрасывать их при одновременных запросах)
+process.on('unhandledRejection', (reason, promise) => {
+    if (reason && reason.message && reason.message.includes('message is not modified')) {
+        return; // Игнорируем эту ошибку
+    }
+    console.error('[UNHANDLED REJECTION]', reason);
+});
+
 const startedAt = new Date();
 console.log('========================================');
 console.log('TG Text RPG bot starting...');
@@ -436,22 +444,24 @@ bot.on('callback_query', (query) => {
     }
 
     // Отправка результата
-    if (result.message) {
-        if (result.editOnly && query.message) {
+    if (result.message || result.removeKeyboard) {
+        if (result.editOnly && query.message && result.message) {
             bot.editMessageText(result.message, {
                 chat_id: currentChatID,
                 message_id: query.message.message_id,
                 parse_mode: 'Markdown',
                 reply_markup: JSON.stringify(result.buttons ? result.buttons.reply_markup : { inline_keyboard: [] })
-            });
+            }).catch(() => {});
         } else {
-            if (result.removeKeyboard && query.message) {
+            if (query.message) {
                 bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
                     chat_id: currentChatID,
                     message_id: query.message.message_id,
-                });
+                }).catch(() => {});
             }
-            bot.sendMessage(currentChatID, result.message, result.buttons);
+            if (result.message) {
+                bot.sendMessage(currentChatID, result.message, result.buttons);
+            }
         }
     }
 

@@ -11,6 +11,7 @@ export const DEBUG_MERCHANT_QUEST_MASS_SPAWN = false;     // Спавн торг
 export const DEBUG_PORTAL_MASS_SPAWN = false;              // Спавн порталов на все клетки
 export const DEBUG_LOG_SPAWN = true;                      // Логирование статистики спавна (порталы, предметы, NPC)
 export const DEBUG_LOG_PORTAL = false;                     // Логирование создания порталов
+export const DEBUG_SHOW_MISS_REASON = false;                 // Показывать причину промаха при атаке
 
 // Вероятности спавна сущностей (0.0 - 1.0)
 export const SPAWN_CHANCES = Object.freeze({
@@ -20,6 +21,14 @@ export const SPAWN_CHANCES = Object.freeze({
     PORTAL: 0.1,
     ITEM: 0.15,
     WEAPON: 0.12,
+    MISS_REASON: 0.1,
+    LIGHTNING: 0.2,
+});
+
+// Урон от молнии
+export const LIGHTNING_DAMAGE = Object.freeze({
+    MIN: 10,
+    MAX: 25,
 });
 
 // Настройки предметов
